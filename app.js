@@ -177,7 +177,9 @@
     }
     let value = Number(normalized);
     if (!Number.isFinite(value) || value < 0) return null;
-    const unit = (text.match(/\b(kg|kgs|g|gram|lb|lbs|ton)\b/i) || [])[0]?.toLowerCase();
+    const detectedUnit = (text.match(/\b(kg|kgs|g|gram|lb|lbs|ton)\b/i) || [])[0]?.toLowerCase();
+    const selectedUnit = $('serialUnit')?.value || 'auto';
+    const unit = selectedUnit === 'auto' ? detectedUnit : selectedUnit;
     if (unit === 'g' || unit === 'gram') value /= 1000;
     else if (unit === 'lb' || unit === 'lbs') value *= 0.45359237;
     else if (unit === 'ton') value *= 1000;
@@ -209,24 +211,24 @@
     if (mode === 'stx') {
       const frames = [];
       let rest = buffer;
+      const stx = String.fromCharCode(2);
+      const etx = String.fromCharCode(3);
       while (true) {
-        const begin = rest.indexOf('\\x02');
+        const begin = rest.indexOf(stx);
         if (begin < 0) return { frames, rest: rest.slice(-2048) };
-        const finish = rest.indexOf('\\x03', begin + 1);
+        const finish = rest.indexOf(etx, begin + 1);
         if (finish < 0) return { frames, rest: rest.slice(begin) };
         frames.push(rest.slice(begin + 1, finish));
         rest = rest.slice(finish + 1);
       }
     }
     if (mode === 'continuous') {
-      // Generic stream framing: retain a short rolling window for indicators
-      // that continuously overwrite or append their ASCII weight display.
-      const chunks = buffer.split(/[\\r\\n]+/).filter(Boolean);
+      const chunks = buffer.split(/[\r\n]+/).filter(Boolean);
       if (chunks.length > 1) return { frames: chunks.slice(0, -1), rest: chunks[chunks.length - 1].slice(-256) };
       if (buffer.length >= 24) return { frames: [buffer], rest: buffer.slice(-12) };
       return { frames: [], rest: buffer };
     }
-    const lines = buffer.split(/[\\r\\n]+/);
+    const lines = buffer.split(/[\r\n]+/);
     return { frames: lines.slice(0, -1).filter(Boolean), rest: lines[lines.length - 1] || '' };
   }
   async function readSerial() {
@@ -238,8 +240,7 @@
           const result = await serialReader.read();
           if (result.done) break;
           buffer += new TextDecoder().decode(result.value);
-          const mode = $('serialMode').value;
-          const split = splitSerialFrames(buffer, mode);
+          const split = splitSerialFrames(buffer, $('serialMode').value);
           buffer = split.rest;
           for (const frame of split.frames) {
             const value = parseSerialWeight(frame);
