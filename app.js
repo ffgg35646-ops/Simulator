@@ -29,7 +29,7 @@
     clearTimeout(toastTimer); toastTimer = setTimeout(() => toast.classList.remove('show'), 2800);
   }
   function setWeight(value) {
-    liveWeight = Math.max(0, Math.min(CAPACITY, Math.round(Number(value) / 10) * 10));
+    liveWeight = Math.max(0, Math.min(CAPACITY, Math.round(Number(value) * 100) / 100));
     $('liveWeight').innerHTML = fmt(liveWeight) + '<span>كجم</span>';
     $('weightSlider').value = liveWeight;
     $('sliderValue').textContent = fmt(liveWeight) + ' كجم';
