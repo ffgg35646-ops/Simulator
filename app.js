@@ -191,7 +191,7 @@
     }
     try {
       serialPort = await navigator.serial.requestPort();
-      await serialPort.open({ baudRate: Number($('serialBaud').value), dataBits: 8, stopBits: 1, parity: 'none' });
+      await serialPort.open({ baudRate: Number($('serialBaud').value), dataBits: Number($('serialDataBits').value), stopBits: Number($('serialStopBits').value), parity: $('serialParity').value, flowControl: $('serialFlow').value });
       serialReading = true;
       $('serialState').textContent = 'متصل — في انتظار بيانات الميزان';
       $('serialConnect').disabled = true;
@@ -205,6 +205,30 @@
       showToast('لم يتم الاتصال بالميزان');
     }
   }
+  function splitSerialFrames(buffer, mode) {
+    if (mode === 'stx') {
+      const frames = [];
+      let rest = buffer;
+      while (true) {
+        const begin = rest.indexOf('\\x02');
+        if (begin < 0) return { frames, rest: rest.slice(-2048) };
+        const finish = rest.indexOf('\\x03', begin + 1);
+        if (finish < 0) return { frames, rest: rest.slice(begin) };
+        frames.push(rest.slice(begin + 1, finish));
+        rest = rest.slice(finish + 1);
+      }
+    }
+    if (mode === 'continuous') {
+      // Generic stream framing: retain a short rolling window for indicators
+      // that continuously overwrite or append their ASCII weight display.
+      const chunks = buffer.split(/[\\r\\n]+/).filter(Boolean);
+      if (chunks.length > 1) return { frames: chunks.slice(0, -1), rest: chunks[chunks.length - 1].slice(-256) };
+      if (buffer.length >= 24) return { frames: [buffer], rest: buffer.slice(-12) };
+      return { frames: [], rest: buffer };
+    }
+    const lines = buffer.split(/[\\r\\n]+/);
+    return { frames: lines.slice(0, -1).filter(Boolean), rest: lines[lines.length - 1] || '' };
+  }
   async function readSerial() {
     let buffer = '';
     while (serialPort && serialPort.readable && serialReading) {
@@ -214,22 +238,18 @@
           const result = await serialReader.read();
           if (result.done) break;
           buffer += new TextDecoder().decode(result.value);
-          if ($('serialMode').value === 'continuous') {
-            const value = parseSerialWeight(buffer);
-            if (value !== null) { setWeight(Math.min(CAPACITY, value)); setStability(true); buffer = ''; }
-          } else {
-            const lines = buffer.split(/\r?\n/);
-            buffer = lines.pop() || '';
-            for (const line of lines) {
-              const value = parseSerialWeight(line);
-              if (value !== null) {
-                setWeight(Math.min(CAPACITY, value));
-                setStability(true);
-                $('serialState').textContent = 'متصل — آخر قراءة: ' + fmt(value) + ' كجم';
-              }
+          const mode = $('serialMode').value;
+          const split = splitSerialFrames(buffer, mode);
+          buffer = split.rest;
+          for (const frame of split.frames) {
+            const value = parseSerialWeight(frame);
+            if (value !== null) {
+              setWeight(Math.min(CAPACITY, value));
+              setStability(true);
+              $('serialState').textContent = 'متصل — آخر قراءة: ' + fmt(value) + ' كجم · ' + ($('protocolProfile').selectedOptions[0]?.text || 'Generic');
             }
-            if (buffer.length > 512) buffer = buffer.slice(-128);
           }
+          if (buffer.length > 2048) buffer = buffer.slice(-256);
         }
       } catch (error) {
         if (serialReading) $('serialState').textContent = 'انقطع تدفق البيانات: ' + error.message;
