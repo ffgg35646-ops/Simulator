@@ -167,7 +167,15 @@
     if (!text) return null;
     const match = text.match(/[-+]?\d+(?:[.,]\d+)?/);
     if (!match) return null;
-    let value = Number(match[0].replace(',', '.'));
+    const raw = match[0];
+    let normalized = raw;
+    if (raw.includes(',') && !raw.includes('.')) {
+      const digits = raw.split(',')[1] || '';
+      normalized = digits.length === 3 ? raw.replace(/,/g, '') : raw.replace(',', '.');
+    } else if (raw.includes(',') && raw.includes('.')) {
+      normalized = raw.replace(/,/g, '');
+    }
+    let value = Number(normalized);
     if (!Number.isFinite(value) || value < 0) return null;
     const unit = (text.match(/\b(kg|kgs|g|gram|lb|lbs|ton)\b/i) || [])[0]?.toLowerCase();
     if (unit === 'g' || unit === 'gram') value /= 1000;
