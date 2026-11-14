@@ -113,6 +113,7 @@ ipcMain.handle('tcp:disconnect', () => { tcpSocket?.destroy(); tcpSocket = null;
 app.whenReady().then(() => {
   openDatabase();
   session.defaultSession.setPermissionCheckHandler((_wc, permission) => permission === 'serial' || permission === 'hid');
+  session.defaultSession.webRequest.onBeforeRequest({ urls: ['http://*/*', 'https://*/*'] }, (_details, callback) => callback({ cancel: true }));
   session.defaultSession.setPermissionRequestHandler((_wc, permission, callback) => callback(permission === 'serial' || permission === 'hid'));
   createWindow();
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
