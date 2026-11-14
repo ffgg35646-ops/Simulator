@@ -15,10 +15,20 @@
   let serialReader = null;
   let serialReading = false;
 
+  const desktop = window.desktopBridge && window.desktopBridge.isDesktop;
   function readJSON(key, fallback) {
-    try { const value = JSON.parse(localStorage.getItem(key)); return value ?? fallback; } catch { return fallback; }
+    try {
+      const stored = desktop ? window.desktopBridge.getItem(key) : localStorage.getItem(key);
+      const value = JSON.parse(stored);
+      return value ?? fallback;
+    } catch { return fallback; }
   }
-  function saveRecords() { localStorage.setItem(STORAGE_KEY, JSON.stringify(records)); renderAll(); }
+  function writeJSON(key, value) {
+    const serialized = JSON.stringify(value);
+    if (desktop) window.desktopBridge.setItem(key, serialized);
+    else localStorage.setItem(key, serialized);
+  }
+  function saveRecords() { writeJSON(STORAGE_KEY, records); renderAll(); }
   function fmt(value) { return Number(value || 0).toLocaleString('en-US'); }
   function now() { return new Date(); }
   function stamp(date = now()) { return date.toLocaleString('ar-EG', { dateStyle: 'short', timeStyle: 'short' }); }
@@ -314,6 +324,39 @@
   $('exportExcel').addEventListener('click',exportExcel);
   $('serialConnect').addEventListener('click',connectSerial);
   $('serialDisconnect').addEventListener('click',disconnectSerial);
+  if (desktop) {
+    $('storageMode').textContent = 'SQLite';
+    $('storageDescription').textContent = 'قاعدة بيانات محلية على هذا الكمبيوتر — لا تحتاج إنترنت';
+    $('tcpConnect').addEventListener('click', async () => {
+      try {
+        await window.desktopBridge.tcpConnect({ host: $('tcpHost').value, port: $('tcpPort').value });
+        $('tcpState').textContent = 'متصل — يستقبل البيانات من الشبكة المحلية';
+        $('tcpConnect').disabled = true; $('tcpDisconnect').disabled = false;
+        showToast('تم اتصال TCP');
+      } catch (error) { $('tcpState').textContent = 'فشل الاتصال: ' + error.message; }
+    });
+    $('tcpDisconnect').addEventListener('click', async () => {
+      await window.desktopBridge.tcpDisconnect();
+      $('tcpState').textContent = 'تم قطع اتصال TCP';
+      $('tcpConnect').disabled = false; $('tcpDisconnect').disabled = true;
+    });
+    window.desktopBridge.onTcpData(data => {
+      const value = parseSerialWeight(data);
+      if (value !== null) {
+        setWeight(Math.min(CAPACITY, value)); setStability(true);
+        $('tcpState').textContent = 'متصل — آخر قراءة: ' + fmt(value) + ' كجم';
+      }
+    });
+    window.desktopBridge.onTcpClosed(() => {
+      $('tcpState').textContent = 'انقطع اتصال TCP';
+      $('tcpConnect').disabled = false; $('tcpDisconnect').disabled = true;
+    });
+  } else {
+    $('tcpConnect').disabled = true;
+    $('tcpDisconnect').disabled = true;
+    $('tcpState').textContent = 'اتصال TCP الخام متاح في نسخة Windows فقط';
+  }
+
   if (!('serial' in navigator)) $('serialState').textContent = 'استخدم Chrome أو Edge على كمبيوتر لعرض منافذ Serial.';
   if (navigator.serial) navigator.serial.addEventListener('disconnect', () => { if (serialPort) disconnectSerial(); });
   $('exportQuick').addEventListener('click',exportCSV);
@@ -323,7 +366,7 @@
   $('printTicket').addEventListener('click',()=>window.print());
   $('ticketModal').addEventListener('click',e=>{if(e.target===$('ticketModal'))$('ticketModal').classList.remove('open');});
   document.addEventListener('click',e=>{const b=e.target.closest('[data-ticket]');if(b){const r=records.find(x=>x.id===b.dataset.ticket);if(r)openTicket(r);}});
-  $('saveSettings').addEventListener('click',()=>{settings.systemName=$('systemName').value.trim()||'Weighbridge 120T';localStorage.setItem(SETTINGS_KEY,JSON.stringify(settings));document.title=settings.systemName+' | نظام إدارة البسكول';$('settingsMessage').textContent='تم حفظ الإعدادات.';showToast('تم حفظ الإعدادات');});
+  $('saveSettings').addEventListener('click',()=>{settings.systemName=$('systemName').value.trim()||'Weighbridge 120T';writeJSON(SETTINGS_KEY,settings);document.title=settings.systemName+' | نظام إدارة البسكول';$('settingsMessage').textContent='تم حفظ الإعدادات.';showToast('تم حفظ الإعدادات');});
   $('clearData').addEventListener('click',()=>{if(!confirm('هل أنت متأكد من مسح كل عمليات الوزن المحفوظة في هذا المتصفح؟ لا يمكن التراجع عن هذه الخطوة.'))return;records=[];saveRecords();resetTicket();showToast('تم مسح بيانات التجربة');});
   $('systemName').value=settings.systemName||'Weighbridge 120T';
   setWeight(liveWeight);setStability(true);updateCaptureUI();renderAll();
