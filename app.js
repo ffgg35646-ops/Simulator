@@ -11,6 +11,9 @@
   let secondCapture = null;
   let activeRecord = null;
   let toastTimer = null;
+  let serialPort = null;
+  let serialReader = null;
+  let serialReading = false;
 
   function readJSON(key, fallback) {
     try { const value = JSON.parse(localStorage.getItem(key)); return value ?? fallback; } catch { return fallback; }
@@ -64,7 +67,7 @@
         customer: $('customerInput').value.trim() || '—',
         firstWeight: firstCapture.weight, secondWeight: secondCapture.weight,
         netWeight: net, firstTime: firstCapture.time, secondTime: secondCapture.time,
-        createdAt: now().toISOString(), source: 'SIMULATOR'
+        createdAt: now().toISOString(), source: serialPort ? 'RS232 / USB Serial' : 'SIMULATOR'
       };
       records.unshift(record); activeRecord = record; saveRecords();
       $('formMessage').textContent = 'اكتملت عملية الوزن وحُفظت التذكرة بنجاح.';
@@ -116,7 +119,7 @@
     $('todayCount').textContent = fmt(todays.length);
     $('todayNet').innerHTML = fmt(todayNet) + ' <em>كجم</em>';
     $('lastWeighing').textContent = records.length ? stamp(new Date(records[0].createdAt)) : '—';
-    $('connectionSummary').textContent = 'محاكاة';
+    $('connectionSummary').textContent = serialPort ? 'متصل Serial' : 'محاكاة';
     $('recentTable').innerHTML = records.length ? records.slice(0,5).map(r=>rowMarkup(r)).join('') : '<tr class="empty-row"><td colspan="7">لا توجد عمليات مسجلة حتى الآن</td></tr>';
     renderRecords();
     renderVehicles();
@@ -159,6 +162,104 @@
     $('sidebar').classList.remove('open');
     if(name==='weighings')renderRecords();
   }
+  function parseSerialWeight(line) {
+    const text = String(line || '').replace(/\u0000/g, '').trim();
+    if (!text) return null;
+    const match = text.match(/[-+]?\d+(?:[.,]\d+)?/);
+    if (!match) return null;
+    let value = Number(match[0].replace(',', '.'));
+    if (!Number.isFinite(value) || value < 0) return null;
+    const unit = (text.match(/\b(kg|kgs|g|gram|lb|lbs|ton)\b/i) || [])[0]?.toLowerCase();
+    if (unit === 'g' || unit === 'gram') value /= 1000;
+    else if (unit === 'lb' || unit === 'lbs') value *= 0.45359237;
+    else if (unit === 'ton') value *= 1000;
+    return value;
+  }
+  async function connectSerial() {
+    if (!('serial' in navigator)) {
+      showToast('الاتصال التسلسلي يحتاج Chrome أو Edge على كمبيوتر عبر HTTPS.');
+      $('serialState').textContent = 'المتصفح لا يدعم Web Serial';
+      return;
+    }
+    try {
+      serialPort = await navigator.serial.requestPort();
+      await serialPort.open({ baudRate: Number($('serialBaud').value), dataBits: 8, stopBits: 1, parity: 'none' });
+      serialReading = true;
+      $('serialState').textContent = 'متصل — في انتظار بيانات الميزان';
+      $('serialConnect').disabled = true;
+      $('serialDisconnect').disabled = false;
+      $('connectionSummary').textContent = 'متصل Serial';
+      showToast('تم الاتصال بالمنفذ. في انتظار بيانات الميزان.');
+      readSerial();
+    } catch (error) {
+      serialPort = null;
+      $('serialState').textContent = 'تعذر الاتصال: ' + (error.message || 'لم يتم اختيار منفذ');
+      showToast('لم يتم الاتصال بالميزان');
+    }
+  }
+  async function readSerial() {
+    let buffer = '';
+    while (serialPort && serialPort.readable && serialReading) {
+      try {
+        serialReader = serialPort.readable.getReader();
+        while (serialReading) {
+          const result = await serialReader.read();
+          if (result.done) break;
+          buffer += new TextDecoder().decode(result.value);
+          if ($('serialMode').value === 'continuous') {
+            const value = parseSerialWeight(buffer);
+            if (value !== null) { setWeight(Math.min(CAPACITY, value)); setStability(true); buffer = ''; }
+          } else {
+            const lines = buffer.split(/\r?\n/);
+            buffer = lines.pop() || '';
+            for (const line of lines) {
+              const value = parseSerialWeight(line);
+              if (value !== null) {
+                setWeight(Math.min(CAPACITY, value));
+                setStability(true);
+                $('serialState').textContent = 'متصل — آخر قراءة: ' + fmt(value) + ' كجم';
+              }
+            }
+            if (buffer.length > 512) buffer = buffer.slice(-128);
+          }
+        }
+      } catch (error) {
+        if (serialReading) $('serialState').textContent = 'انقطع تدفق البيانات: ' + error.message;
+      } finally {
+        try { serialReader.releaseLock(); } catch {}
+        serialReader = null;
+      }
+    }
+  }
+  async function disconnectSerial() {
+    serialReading = false;
+    try { if (serialReader) await serialReader.cancel(); } catch {}
+    try { if (serialPort) await serialPort.close(); } catch {}
+    serialPort = null;
+    serialReader = null;
+    $('serialConnect').disabled = false;
+    $('serialDisconnect').disabled = true;
+    $('serialState').textContent = 'غير متصل — وضع المحاكاة نشط';
+    $('connectionSummary').textContent = 'محاكاة';
+    showToast('تم قطع الاتصال بالميزان');
+  }
+  function exportExcel() {
+    if (!records.length) { showToast('لا توجد عمليات لتصديرها'); return; }
+    if (!window.XLSX) { showToast('مكتبة Excel لم تُحمّل. تحقق من اتصال الإنترنت.'); return; }
+    const rows = records.slice().reverse().map(r => ({
+      'رقم التذكرة': r.id, 'رقم السيارة': r.plate, 'السائق': r.driver, 'العميل': r.customer,
+      'الوزنة الأولى (كجم)': r.firstWeight, 'الوزنة الثانية (كجم)': r.secondWeight,
+      'صافي الحمولة (كجم)': r.netWeight, 'مصدر القراءة': r.source,
+      'تاريخ العملية': stamp(new Date(r.createdAt))
+    }));
+    const sheet = XLSX.utils.json_to_sheet(rows);
+    sheet['!cols'] = [{wch:22},{wch:18},{wch:20},{wch:24},{wch:20},{wch:20},{wch:22},{wch:22},{wch:24}];
+    const book = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(book, sheet, 'سجل الوزن');
+    XLSX.writeFile(book, 'Weighbridge-120T-Records-' + dateKey(now()) + '.xlsx');
+    showToast('تم تنزيل ملف Excel بنجاح');
+  }
+
   function exportCSV() {
     if(!records.length){showToast('لا توجد عمليات لتصديرها');return;}
     const header=['رقم التذكرة','السيارة','السائق','العميل','الوزنة الأولى كجم','الوزنة الثانية كجم','الصافي كجم','التاريخ'];
@@ -181,6 +282,11 @@
   $('resetTicket').addEventListener('click',resetTicket);
   $('recordSearch').addEventListener('input',renderRecords);
   $('exportRecords').addEventListener('click',exportCSV);
+  $('exportExcel').addEventListener('click',exportExcel);
+  $('serialConnect').addEventListener('click',connectSerial);
+  $('serialDisconnect').addEventListener('click',disconnectSerial);
+  if (!('serial' in navigator)) $('serialState').textContent = 'استخدم Chrome أو Edge على كمبيوتر لعرض منافذ Serial.';
+  if (navigator.serial) navigator.serial.addEventListener('disconnect', () => { if (serialPort) disconnectSerial(); });
   $('exportQuick').addEventListener('click',exportCSV);
   $('printReport').addEventListener('click',()=>window.print());
   $('closeTicket').addEventListener('click',()=>$('ticketModal').classList.remove('open'));
