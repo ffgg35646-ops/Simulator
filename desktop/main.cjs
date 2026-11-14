@@ -2,9 +2,11 @@ const { app, BrowserWindow, ipcMain, dialog, session } = require('electron');
 const path = require('node:path');
 const net = require('node:net');
 const Database = require('better-sqlite3');
+const { SerialPort } = require('serialport');
 
 let db;
 let tcpSocket = null;
+let serialDevice = null;
 let mainWindow;
 
 function openDatabase() {
@@ -60,6 +62,33 @@ function createWindow() {
   mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
 }
 
+ipcMain.handle('serial:list', async () => SerialPort.list());
+ipcMain.handle('serial:open', async (_event, config) => {
+  if (serialDevice?.isOpen) await new Promise(resolve => serialDevice.close(() => resolve()));
+  const portPath = String(config?.path || '');
+  if (!portPath) throw new Error('اختر منفذ COM أولاً.');
+  const port = new SerialPort({
+    path: portPath,
+    baudRate: Number(config.baudRate),
+    dataBits: Number(config.dataBits),
+    stopBits: Number(config.stopBits),
+    parity: String(config.parity),
+    rtscts: config.flowControl === 'hardware',
+    autoOpen: false
+  });
+  await new Promise((resolve, reject) => port.open(error => error ? reject(error) : resolve()));
+  serialDevice = port;
+  port.on('data', chunk => mainWindow?.webContents.send('serial:data', chunk.toString('utf8')));
+  port.on('error', error => mainWindow?.webContents.send('serial:error', error.message));
+  port.on('close', () => { mainWindow?.webContents.send('serial:closed'); if (serialDevice === port) serialDevice = null; });
+  return { connected: true, path: portPath };
+});
+ipcMain.handle('serial:close', async () => {
+  if (serialDevice?.isOpen) await new Promise(resolve => serialDevice.close(() => resolve()));
+  serialDevice = null;
+  return true;
+});
+
 ipcMain.handle('tcp:connect', async (_event, config) => {
   if (tcpSocket) { tcpSocket.destroy(); tcpSocket = null; }
   const host = String(config?.host || '').trim();
@@ -88,5 +117,5 @@ app.whenReady().then(() => {
   createWindow();
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 });
-app.on('before-quit', () => { tcpSocket?.destroy(); db?.close(); });
+app.on('before-quit', () => { tcpSocket?.destroy(); if (serialDevice?.isOpen) serialDevice.close(); db?.close(); });
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
