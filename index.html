@@ -1,0 +1,106 @@
+<!doctype html>
+<html lang="ar" dir="rtl">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <meta name="theme-color" content="#101820" />
+  <meta name="description" content="Weighbridge 120T — محاكي وإدارة ميزان الشاحنات" />
+  <title>Weighbridge 120T | نظام إدارة البسكول</title>
+  <link rel="stylesheet" href="./styles.css" />
+</head>
+<body>
+  <div class="app-shell">
+    <aside class="sidebar" id="sidebar">
+      <div class="brand">
+        <div class="brand-mark">W<span>120</span></div>
+        <div><strong>WEIGHBRIDGE</strong><small>نظام إدارة البسكول</small></div>
+      </div>
+      <div class="sidebar-label">القائمة الرئيسية</div>
+      <nav class="nav-menu" aria-label="القائمة الرئيسية">
+        <button class="nav-link active" data-view="dashboard"><span class="nav-icon">◫</span> لوحة التشغيل</button>
+        <button class="nav-link" data-view="weighings"><span class="nav-icon">▤</span> سجل الوزن</button>
+        <button class="nav-link" data-view="vehicles"><span class="nav-icon">▰</span> السيارات والعملاء</button>
+        <button class="nav-link" data-view="reports"><span class="nav-icon">▥</span> التقارير</button>
+        <button class="nav-link" data-view="connections"><span class="nav-icon">⌁</span> الاتصال بالأجهزة</button>
+        <button class="nav-link" data-view="settings"><span class="nav-icon">⚙</span> الإعدادات</button>
+      </nav>
+      <div class="sidebar-bottom">
+        <div class="opensource-card"><span class="pulse-dot"></span><div><strong>وضع المحاكاة</strong><small>لا يوجد ميزان حقيقي متصل</small></div></div>
+        <div class="sidebar-foot">WEIGHBRIDGE 120T <span>الإصدار 0.1.0</span></div>
+      </div>
+    </aside>
+
+    <main class="main-area">
+      <header class="topbar">
+        <div class="topbar-title"><button class="mobile-menu" id="mobileMenu" aria-label="فتح القائمة">☰</button><div><span class="eyebrow">إدارة ومراقبة الوزن</span><h1 id="pageTitle">لوحة التشغيل</h1></div></div>
+        <div class="topbar-actions"><div class="system-status"><span class="pulse-dot"></span> النظام يعمل محليًا</div><div class="avatar">م</div></div>
+      </header>
+
+      <section class="view active" id="view-dashboard">
+        <div class="welcome-row"><div><h2>مرحبًا بك في مركز التحكم</h2><p>تابع حركة الوزن وسجّل عمليات الشاحنات من مكان واحد.</p></div><div class="date-chip" id="todayDate"></div></div>
+        <div class="stats-grid">
+          <article class="stat-card"><div class="stat-icon teal">▤</div><div><span>عمليات اليوم</span><strong id="todayCount">0</strong><small>إجمالي التذاكر المسجلة</small></div></article>
+          <article class="stat-card"><div class="stat-icon blue">▰</div><div><span>إجمالي صافي الوزن اليوم</span><strong id="todayNet">0 <em>كجم</em></strong><small>مجموع الحمولات الصافية</small></div></article>
+          <article class="stat-card"><div class="stat-icon amber">◷</div><div><span>آخر عملية وزن</span><strong id="lastWeighing">—</strong><small>آخر تذكرة محفوظة</small></div></article>
+          <article class="stat-card"><div class="stat-icon purple">⌁</div><div><span>حالة الاتصال</span><strong class="status-text" id="connectionSummary">محاكاة</strong><small>مصدر قراءة الوزن الحالي</small></div></article>
+        </div>
+
+        <div class="work-grid">
+          <section class="panel scale-panel">
+            <div class="panel-heading"><div><span class="eyebrow">LIVE SCALE</span><h3>قراءة الوزن المباشر</h3></div><span class="live-badge"><i></i> مباشر تجريبي</span></div>
+            <div class="weight-display">
+              <div class="weight-caption">الوزن الحالي</div>
+              <div class="weight-value" id="liveWeight">25,660<span>كجم</span></div>
+              <div class="weight-meta"><span class="stable-indicator" id="stableIndicator"><i></i> وزن مستقر</span><span>السعة القصوى 120,000 كجم</span></div>
+              <div class="capacity-track"><div id="capacityFill" style="width:21.38%"></div></div>
+              <div class="capacity-labels"><span>0 كجم</span><strong id="capacityPercent">21.38% من السعة</strong><span>120 طن</span></div>
+            </div>
+            <div class="simulator-box">
+              <div class="simulator-head"><div><strong>لوحة محاكاة الوزن</strong><small>غيّر القراءة لاختبار النظام</small></div><span class="sim-tag">SIMULATOR</span></div>
+              <input id="weightSlider" type="range" min="0" max="120000" step="10" value="25660" />
+              <div class="range-labels"><span>صفر</span><span id="sliderValue">25,660 كجم</span><span>120 طن</span></div>
+              <div class="sim-actions"><button class="btn btn-quiet" id="zeroWeight">تصفير الميزان</button><button class="btn btn-quiet" id="presetLoaded">شاحنة محمّلة</button><button class="btn btn-quiet" id="presetEmpty">شاحنة فارغة</button><button class="btn btn-primary" id="toggleStability">تغيير حالة الثبات</button></div>
+            </div>
+            <div class="capture-area">
+              <div class="capture-title"><div><strong>تسجيل عملية وزن</strong><small>التذكرة تتكون من وزنتين لنفس السيارة</small></div><span class="step-pill" id="weighStep">الوزنة الأولى</span></div>
+              <div class="form-grid">
+                <label>رقم السيارة<input id="plateInput" placeholder="مثال: أ ب ج 1234" /></label>
+                <label>اسم السائق<input id="driverInput" placeholder="اسم السائق" /></label>
+                <label class="full-field">العميل / الشركة<input id="customerInput" placeholder="اسم العميل أو الشركة" /></label>
+              </div>
+              <div class="weigh-captures">
+                <div class="capture-box"><span>الوزنة الأولى</span><strong id="firstWeight">—</strong><small id="firstTime">لم تسجل بعد</small></div>
+                <div class="capture-arrow">←</div>
+                <div class="capture-box"><span>الوزنة الثانية</span><strong id="secondWeight">—</strong><small id="secondTime">لم تسجل بعد</small></div>
+                <div class="capture-box net-box"><span>صافي الحمولة</span><strong id="netWeight">—</strong><small>الفرق بين الوزنتين</small></div>
+              </div>
+              <div class="capture-buttons"><button class="btn btn-primary btn-large" id="captureWeight">تسجيل الوزنة الأولى</button><button class="btn btn-outline" id="resetTicket">عملية جديدة</button></div>
+              <p class="inline-message" id="formMessage" role="status"></p>
+            </div>
+          </section>
+
+          <aside class="right-column">
+            <section class="panel connection-panel"><div class="panel-heading"><div><span class="eyebrow">DEVICE LINK</span><h3>مصدر قراءة الوزن</h3></div><span class="mini-status">تجريبي</span></div><div class="connection-option active"><span class="connection-symbol">⌁</span><div><strong>محاكي داخلي</strong><small>يولّد قراءات وزن افتراضية</small></div><span class="check-mark">✓</span></div><div class="connection-option"><span class="connection-symbol">⇄</span><div><strong>RS232 / USB</strong><small>بانتظار تعريف مؤشر الوزن</small></div><span class="lock-mark">—</span></div><div class="connection-option"><span class="connection-symbol">⌘</span><div><strong>Ethernet TCP/IP</strong><small>بانتظار عنوان الجهاز والبروتوكول</small></div><span class="lock-mark">—</span></div><button class="btn btn-outline btn-block" data-go="connections">إعدادات الاتصال</button></section>
+            <section class="panel quick-panel"><div class="panel-heading"><div><span class="eyebrow">QUICK ACCESS</span><h3>اختصارات سريعة</h3></div></div><button class="quick-link" data-go="weighings"><span>▤</span> عرض سجل الوزن <b>←</b></button><button class="quick-link" data-go="reports"><span>▥</span> التقارير والإحصائيات <b>←</b></button><button class="quick-link" id="exportQuick"><span>⇩</span> تصدير سجل العمليات <b>←</b></button></section>
+          </aside>
+        </div>
+        <section class="panel recent-panel"><div class="panel-heading"><div><span class="eyebrow">LATEST ACTIVITY</span><h3>أحدث عمليات الوزن</h3></div><button class="text-button" data-go="weighings">عرض الكل ←</button></div><div class="table-wrap"><table><thead><tr><th>رقم التذكرة</th><th>السيارة</th><th>العميل</th><th>الوزن الأول</th><th>الوزن الثاني</th><th>الصافي</th><th>التاريخ</th></tr></thead><tbody id="recentTable"><tr class="empty-row"><td colspan="7">لا توجد عمليات مسجلة حتى الآن</td></tr></tbody></table></div></section>
+      </section>
+
+      <section class="view" id="view-weighings"><div class="section-intro"><div><h2>سجل عمليات الوزن</h2><p>جميع التذاكر المحفوظة في هذا المتصفح.</p></div><button class="btn btn-outline" id="exportRecords">تصدير CSV ↓</button></div><div class="panel"><div class="toolbar"><input id="recordSearch" class="search-input" placeholder="ابحث برقم التذكرة أو السيارة أو العميل..." /><span class="record-count" id="recordCount">0 عملية</span></div><div class="table-wrap"><table><thead><tr><th>رقم التذكرة</th><th>السيارة</th><th>السائق</th><th>العميل</th><th>الوزن الأول</th><th>الوزن الثاني</th><th>الصافي</th><th>التاريخ</th><th>إجراء</th></tr></thead><tbody id="recordsTable"><tr class="empty-row"><td colspan="9">لا توجد عمليات مسجلة</td></tr></tbody></table></div></div></section>
+
+      <section class="view" id="view-vehicles"><div class="section-intro"><div><h2>السيارات والعملاء</h2><p>ملخص السيارات والعملاء الذين ظهرت بياناتهم في التذاكر.</p></div></div><div class="stats-grid compact-stats"><article class="stat-card"><div class="stat-icon teal">▰</div><div><span>عدد السيارات</span><strong id="vehicleCount">0</strong></div></article><article class="stat-card"><div class="stat-icon blue">♙</div><div><span>عدد السائقين</span><strong id="driverCount">0</strong></div></article><article class="stat-card"><div class="stat-icon purple">▣</div><div><span>عدد العملاء</span><strong id="customerCount">0</strong></div></article></div><div class="panel"><div class="panel-heading"><div><h3>السيارات المسجلة تلقائيًا</h3><small>تُستخرج من عمليات الوزن المحفوظة</small></div></div><div class="table-wrap"><table><thead><tr><th>رقم السيارة</th><th>السائق الأخير</th><th>العميل الأخير</th><th>عدد العمليات</th><th>إجمالي صافي الوزن</th></tr></thead><tbody id="vehiclesTable"><tr class="empty-row"><td colspan="5">لا توجد بيانات بعد</td></tr></tbody></table></div></div></section>
+
+      <section class="view" id="view-reports"><div class="section-intro"><div><h2>التقارير والإحصائيات</h2><p>نظرة عامة على حركة الوزن المسجلة.</p></div><button class="btn btn-outline" id="printReport">طباعة التقرير</button></div><div class="stats-grid"><article class="stat-card"><div class="stat-icon teal">▤</div><div><span>إجمالي العمليات</span><strong id="reportCount">0</strong></div></article><article class="stat-card"><div class="stat-icon blue">▰</div><div><span>إجمالي صافي الوزن</span><strong id="reportNet">0 كجم</strong></div></article><article class="stat-card"><div class="stat-icon amber">◉</div><div><span>متوسط الحمولة</span><strong id="reportAverage">0 كجم</strong></div></article></div><div class="panel report-panel"><div class="panel-heading"><div><h3>ملخص آخر 7 أيام</h3><small>عدد عمليات الوزن المسجلة يوميًا</small></div></div><div class="chart" id="weeklyChart"><div class="chart-empty">ستظهر الإحصائيات بعد تسجيل عمليات الوزن.</div></div></div></section>
+
+      <section class="view" id="view-connections"><div class="section-intro"><div><h2>الاتصال بأجهزة الوزن</h2><p>إعدادات الربط الفعلي ستُفعّل بعد معرفة موديل مؤشر الوزن وبروتوكوله.</p></div><span class="warning-pill">المحاكاة فقط حاليًا</span></div><div class="connection-grid"><article class="panel protocol-card selected"><div class="protocol-icon">⌁</div><h3>RS232 Serial</h3><p>اتصال تسلسلي عبر منفذ COM أو محول USB إلى Serial.</p><div class="protocol-state">جاهز لمرحلة تعريف البروتوكول</div><button class="btn btn-outline btn-block" disabled>بانتظار بيانات الجهاز</button></article><article class="panel protocol-card"><div class="protocol-icon">▣</div><h3>USB</h3><p>دعم أجهزة USB Serial أو HID حسب طريقة ظهور المؤشر على الكمبيوتر.</p><div class="protocol-state">يحتاج تحديد نوع USB</div><button class="btn btn-outline btn-block" disabled>بانتظار بيانات الجهاز</button></article><article class="panel protocol-card"><div class="protocol-icon">⌘</div><h3>Ethernet TCP/IP</h3><p>قراءة البيانات من عنوان IP ومنفذ TCP وفق بروتوكول الجهاز.</p><div class="protocol-state">يحتاج IP وPort والبروتوكول</div><button class="btn btn-outline btn-block" disabled>بانتظار بيانات الجهاز</button></article></div><div class="panel note-panel"><strong>ملاحظة فنية</strong><p>المتصفح وحده لا يستطيع فتح منافذ COM أو قراءة USB Serial أو إنشاء اتصال TCP خام مع مؤشر الوزن بصورة عامة. عند الانتقال للربط الحقيقي سنضيف خدمة محلية (Bridge) أو نحول المشروع إلى تطبيق سطح مكتب، مع الحفاظ على نفس واجهة الويب.</p></div></section>
+
+      <section class="view" id="view-settings"><div class="section-intro"><div><h2>إعدادات النظام</h2><p>إعدادات عامة للنسخة التجريبية.</p></div></div><div class="panel settings-panel"><div class="settings-row"><div><strong>اسم النظام</strong><small>الاسم الظاهر في الواجهة والتذاكر</small></div><input id="systemName" value="Weighbridge 120T" /></div><div class="settings-row"><div><strong>السعة القصوى</strong><small>الحد الأعلى للوزن بالكيلوجرام</small></div><div class="setting-value">120,000 كجم <span>120 طن</span></div></div><div class="settings-row"><div><strong>وحدة القياس</strong><small>الوحدة الأساسية للقراءات</small></div><div class="setting-value">كيلوجرام (KG)</div></div><div class="settings-row"><div><strong>تخزين البيانات</strong><small>تُحفظ البيانات في مساحة التخزين المحلية للمتصفح</small></div><span class="storage-badge">Local Storage</span></div><div class="settings-actions"><button class="btn btn-primary" id="saveSettings">حفظ الإعدادات</button><button class="btn btn-danger-ghost" id="clearData">مسح بيانات التجربة</button></div><p class="inline-message" id="settingsMessage" role="status"></p></div></section>
+      <footer class="app-footer"><span>WEIGHBRIDGE 120T</span><span>نسخة ويب تجريبية · البيانات محفوظة على هذا المتصفح</span></footer>
+    </main>
+  </div>
+  <div class="toast" id="toast" role="status"></div>
+  <div class="modal-backdrop" id="ticketModal"><div class="ticket-modal"><div class="modal-heading"><h3>تذكرة وزن</h3><button id="closeTicket" aria-label="إغلاق">×</button></div><div id="ticketContent"></div><div class="modal-actions"><button class="btn btn-primary" id="printTicket">طباعة التذكرة</button><button class="btn btn-outline" id="closeTicket2">إغلاق</button></div></div></div>
+  <script src="./app.js"></script>
+</body>
+</html>
