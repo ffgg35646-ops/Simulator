@@ -1,0 +1,45 @@
+{
+  "name": "weighbridge-simulator",
+  "version": "1.0.0",
+  "private": true,
+  "description": "Offline-capable weighbridge simulator and desktop application",
+  "main": "desktop/main.cjs",
+  "scripts": {
+    "start": "electron .",
+    "dist:win": "electron-builder --win nsis --x64",
+    "dist:win:portable": "electron-builder --win portable --x64"
+  },
+  "dependencies": {
+    "better-sqlite3": "^11.10.0",
+    "xlsx": "^0.18.5"
+  },
+  "devDependencies": {
+    "electron": "^37.2.6",
+    "electron-builder": "^26.0.12"
+  },
+  "build": {
+    "appId": "com.simulator.weighbridge",
+    "productName": "Weighbridge Simulator",
+    "asar": true,
+    "files": [
+      "index.html",
+      "app.js",
+      "styles.css",
+      "desktop/**/*",
+      "node_modules/**/*",
+      "package.json",
+      "!node_modules/.cache/**/*"
+    ],
+    "directories": { "output": "release" },
+    "win": {
+      "target": ["nsis", "portable"],
+      "artifactName": "Weighbridge-Simulator-${version}-${arch}.${ext}"
+    },
+    "nsis": {
+      "oneClick": false,
+      "allowToChangeInstallationDirectory": true,
+      "createDesktopShortcut": true,
+      "createStartMenuShortcut": true
+    }
+  }
+}
