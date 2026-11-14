@@ -439,7 +439,7 @@
     $('tcpState').textContent = 'اتصال TCP الخام متاح في نسخة Windows فقط';
   }
 
-  if (!('serial' in navigator)) $('serialState').textContent = 'استخدم Chrome أو Edge على كمبيوتر لعرض منافذ Serial.';
+  if (!desktop && !('serial' in navigator)) $('serialState').textContent = 'استخدم Chrome أو Edge على كمبيوتر لعرض منافذ Serial.';
   if (navigator.serial) navigator.serial.addEventListener('disconnect', () => { if (serialPort) disconnectSerial(); });
   $('exportQuick').addEventListener('click',exportCSV);
   $('printReport').addEventListener('click',()=>window.print());
