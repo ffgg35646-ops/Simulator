@@ -14,6 +14,7 @@
   let serialPort = null;
   let serialReader = null;
   let serialReading = false;
+  let desktopSerialBuffer = '';
 
   const desktop = window.desktopBridge && window.desktopBridge.isDesktop;
   function readJSON(key, fallback) {
@@ -196,6 +197,33 @@
     return value;
   }
   async function connectSerial() {
+    if (desktop) {
+      try {
+        const selectedPath = $('serialDevice').value;
+        if (!selectedPath) { showToast('اختر منفذ COM أولاً'); return; }
+        await window.desktopBridge.openSerialPort({
+          path: selectedPath,
+          baudRate: Number($('serialBaud').value),
+          dataBits: Number($('serialDataBits').value),
+          stopBits: Number($('serialStopBits').value),
+          parity: $('serialParity').value,
+          flowControl: $('serialFlow').value
+        });
+        serialPort = { desktop: true };
+        serialReading = true;
+        desktopSerialBuffer = '';
+        $('serialState').textContent = 'متصل بالمنفذ ' + selectedPath + ' — في انتظار بيانات الميزان';
+        $('serialConnect').disabled = true;
+        $('serialDisconnect').disabled = false;
+        $('connectionSummary').textContent = 'متصل Serial';
+        showToast('تم فتح منفذ الميزان');
+      } catch (error) {
+        serialPort = null;
+        $('serialState').textContent = 'تعذر الاتصال: ' + error.message;
+        showToast('لم يتم الاتصال بالميزان');
+      }
+      return;
+    }
     if (!('serial' in navigator)) {
       showToast('الاتصال التسلسلي يحتاج Chrome أو Edge على كمبيوتر عبر HTTPS.');
       $('serialState').textContent = 'المتصفح لا يدعم Web Serial';
@@ -272,6 +300,16 @@
   }
   async function disconnectSerial() {
     serialReading = false;
+    if (desktop && serialPort?.desktop) {
+      try { await window.desktopBridge.closeSerialPort(); } catch {}
+      serialPort = null;
+      $('serialConnect').disabled = false;
+      $('serialDisconnect').disabled = true;
+      $('serialState').textContent = 'غير متصل — وضع المحاكاة نشط';
+      $('connectionSummary').textContent = 'محاكاة';
+      showToast('تم قطع الاتصال بالميزان');
+      return;
+    }
     try { if (serialReader) await serialReader.cancel(); } catch {}
     try { if (serialPort) await serialPort.close(); } catch {}
     serialPort = null;
@@ -324,6 +362,50 @@
   $('exportExcel').addEventListener('click',exportExcel);
   $('serialConnect').addEventListener('click',connectSerial);
   $('serialDisconnect').addEventListener('click',disconnectSerial);
+  if (desktop) {
+    const refreshPorts = async () => {
+      try {
+        const ports = await window.desktopBridge.listSerialPorts();
+        const select = $('serialDevice');
+        const previous = select.value;
+        select.innerHTML = '<option value="">اختر منفذ الميزان</option>';
+        ports.forEach(port => {
+          const option = document.createElement('option');
+          option.value = port.path;
+          option.textContent = port.path + (port.manufacturer ? ' — ' + port.manufacturer : '');
+          select.appendChild(option);
+        });
+        if (ports.some(port => port.path === previous)) select.value = previous;
+        if (!ports.length) $('serialState').textContent = 'لم يتم العثور على منافذ COM. افحص الكابل والتعريف.';
+      } catch (error) { $('serialState').textContent = 'تعذر قراءة منافذ COM: ' + error.message; }
+    };
+    $('refreshSerialPorts').addEventListener('click', refreshPorts);
+    refreshPorts();
+    window.desktopBridge.onSerialData(data => {
+      desktopSerialBuffer += data;
+      const split = splitSerialFrames(desktopSerialBuffer, $('serialMode').value);
+      desktopSerialBuffer = split.rest;
+      for (const frame of split.frames) {
+        const value = parseSerialWeight(frame);
+        if (value !== null) {
+          setWeight(Math.min(CAPACITY, value)); setStability(true);
+          $('serialState').textContent = 'متصل — آخر قراءة: ' + fmt(value) + ' كجم · ' + ($('protocolProfile').selectedOptions[0]?.text || 'Generic');
+        }
+      }
+      if (desktopSerialBuffer.length > 2048) desktopSerialBuffer = desktopSerialBuffer.slice(-256);
+    });
+    window.desktopBridge.onSerialError(error => { $('serialState').textContent = 'خطأ في منفذ COM: ' + error; });
+    window.desktopBridge.onSerialClosed(() => {
+      serialPort = null; serialReading = false;
+      $('serialConnect').disabled = false; $('serialDisconnect').disabled = true;
+      $('serialState').textContent = 'تم إغلاق منفذ COM';
+    });
+  } else {
+    $('serialDevice').disabled = true;
+    $('refreshSerialPorts').disabled = true;
+    $('serialDevice').innerHTML = '<option>اختر المنفذ من نافذة اتصال المتصفح</option>';
+  }
+
   if (desktop) {
     $('storageMode').textContent = 'SQLite';
     $('storageDescription').textContent = 'قاعدة بيانات محلية على هذا الكمبيوتر — لا تحتاج إنترنت';
