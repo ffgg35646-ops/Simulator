@@ -437,6 +437,10 @@
     });
     refreshPorts();
     window.desktopBridge.onSerialData(data => {
+      if (autoProbeRunning) {
+        const probeValue = parseSerialWeight(data);
+        if (probeValue !== null) autoProbeValue = probeValue;
+      }
       desktopSerialBuffer += data;
       const split = splitSerialFrames(desktopSerialBuffer, $('serialMode').value);
       desktopSerialBuffer = split.rest;
