@@ -15,6 +15,8 @@
   let serialReader = null;
   let serialReading = false;
   let desktopSerialBuffer = '';
+  let autoProbeValue = null;
+  let autoProbeRunning = false;
 
   const desktop = window.desktopBridge && window.desktopBridge.isDesktop;
   function readJSON(key, fallback) {
@@ -380,6 +382,59 @@
       } catch (error) { $('serialState').textContent = 'تعذر قراءة منافذ COM: ' + error.message; }
     };
     $('refreshSerialPorts').addEventListener('click', refreshPorts);
+    $('autoSerialSettings').addEventListener('click', async () => {
+      if (autoProbeRunning) return;
+      const path = $('serialDevice').value;
+      if (!path) { showToast('اختر منفذ الميزان أولاً'); return; }
+      autoProbeRunning = true;
+      $('autoSerialSettings').disabled = true;
+      $('serialState').textContent = 'يجرب إعدادات الاتصال الشائعة… اترك المؤشر يرسل بيانات الوزن.';
+      const candidates = [];
+      for (const baudRate of [9600, 4800, 19200, 2400, 1200, 38400, 57600, 115200, 300, 600, 230400]) {
+        for (const parity of ['none', 'even', 'odd']) candidates.push({ baudRate, dataBits: 8, stopBits: 1, parity, flowControl: 'none' });
+      }
+      try {
+        for (let i = 0; i < candidates.length; i++) {
+          const config = candidates[i];
+          $('serialState').textContent = 'اختبار ' + config.baudRate + ' baud / ' + config.parity + ' (' + (i + 1) + '/' + candidates.length + ')';
+          try {
+            await window.desktopBridge.closeSerialPort();
+            autoProbeValue = null;
+            await window.desktopBridge.openSerialPort({ path, ...config });
+            serialPort = { desktop: true };
+            serialReading = true;
+            desktopSerialBuffer = '';
+            await new Promise(resolve => setTimeout(resolve, 1300));
+            if (autoProbeValue !== null) {
+              $('serialBaud').value = String(config.baudRate);
+              $('serialDataBits').value = String(config.dataBits);
+              $('serialStopBits').value = String(config.stopBits);
+              $('serialParity').value = config.parity;
+              $('serialFlow').value = 'none';
+              $('serialConnect').disabled = true;
+              $('serialDisconnect').disabled = false;
+              $('serialState').textContent = 'تم العثور على قراءة بالاعدادات: ' + config.baudRate + ' / 8-' + config.parity + '-1';
+              showToast('تم العثور على إعداد اتصال يستقبل الوزن');
+              return;
+            }
+          } catch {}
+        }
+        await window.desktopBridge.closeSerialPort();
+        serialPort = null;
+        $('serialState').textContent = 'لم يتم اكتشاف قراءة. جرّب إعدادًا يدويًا أو تحقق من إرسال المؤشر للبيانات.';
+        showToast('لم تنجح التجربة التلقائية');
+      } finally {
+        autoProbeRunning = false;
+        $('autoSerialSettings').disabled = false;
+      }
+    });
+    $('usbHelp').addEventListener('click', () => { refreshPorts(); showToast('محولات USB-to-Serial تظهر هنا كمنفذ COM.'); });
+    $('protocolProfile').addEventListener('change', () => {
+      const profile = $('protocolProfile').value;
+      if (profile === 'stx-etx') $('serialMode').value = 'stx';
+      else if (profile === 'raw-stream') $('serialMode').value = 'continuous';
+      else if (['rice-continuous','rice-demand','mettler','avery','cas','generic'].includes(profile)) $('serialMode').value = 'lines';
+    });
     refreshPorts();
     window.desktopBridge.onSerialData(data => {
       desktopSerialBuffer += data;
