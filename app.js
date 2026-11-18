@@ -2,7 +2,7 @@
   const $ = (id) => document.getElementById(id);
   const STORAGE_KEY = 'weighbridge120t.records.v1';
   const SETTINGS_KEY = 'weighbridge120t.settings.v1';
-  const CAPACITY = 120000;
+  const CAPACITY = 500000;
   let records = readJSON(STORAGE_KEY, []);
   let settings = readJSON(SETTINGS_KEY, { systemName: 'Weighbridge 120T' });
   let liveWeight = 0;
@@ -670,7 +670,7 @@
     const raw = $('manualWeight').value;
     const value = Number(raw);
     if (raw === '' || !Number.isFinite(value) || value < 0 || value > CAPACITY) {
-      showToast('أدخل وزنًا صحيحًا من 0 إلى 120,000 كجم'); return;
+      showToast('أدخل وزنًا صحيحًا من 0 إلى 500,000 كجم'); return;
     }
     $('weightMode').value = 'manual';
     activeWeightSource = 'manual';
