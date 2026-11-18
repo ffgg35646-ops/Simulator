@@ -318,7 +318,7 @@
     const incoming = String(data || '');
     const stx = String.fromCharCode(0x02);
     const etx = String.fromCharCode(0x03);
-    if (!autoScanBuffer.includes(stx) && !incoming.includes(stx) && !incoming.includes(etx) && !/[\\r\\n]/.test(incoming)) {
+    if (!autoScanBuffer.includes(stx) && !incoming.includes(stx) && !incoming.includes(etx) && !/[\r\n]/.test(incoming)) {
       const chunkValue = parseSerialWeight(incoming);
       if (chunkValue !== null) addAutoScanReading(chunkValue, 'generic', 'continuous');
     }
@@ -465,6 +465,11 @@
     return true;
   }
   function consumeDesktopSerialData(data) {
+    if ($('serialMode').value === 'continuous' && !/[\\r\\n\\x02\\x03]/.test(String(data || ''))) {
+      const directValue = parseSerialWeight(data);
+      if (directValue !== null) applySerialValue(directValue);
+      return;
+    }
     if ($('protocolProfile').value === 'yaohua-a9') {
       desktopSerialBuffer += data;
       const extracted = extractYaohuaA9Frames(desktopSerialBuffer);
