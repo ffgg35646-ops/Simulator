@@ -131,8 +131,46 @@
     const cells = '<td><strong>'+esc(r.id)+'</strong></td><td>'+esc(r.plate)+'</td>' +
       (detailed ? '<td>'+esc(r.driver)+'</td>' : '') +
       '<td>'+esc(r.customer)+'</td><td>'+fmt(r.firstWeight)+'</td><td>'+fmt(r.secondWeight)+'</td><td><strong class="net-cell">'+fmt(r.netWeight)+'</strong></td><td>'+stamp(new Date(r.createdAt))+'</td>' +
-      (detailed ? '<td><button class="table-action" data-ticket="'+esc(r.id)+'">التذكرة</button></td>' : '');
+      (detailed ? '<td><div class="table-actions"><button class="table-action" data-ticket="'+esc(r.id)+'">التذكرة</button><button class="table-action delete-row-action" data-delete-record="'+esc(r.id)+'">حذف</button></div></td>' : '');
     return '<tr>'+cells+'</tr>';
+  }
+  function searchRecords(query) {
+    const q = String(query || '').trim().toLocaleLowerCase('ar');
+    if (!q) return records.slice();
+    return records.filter(r => {
+      const values = [
+        r.id, r.plate, r.driver, r.customer, r.source, r.firstSource, r.secondSource,
+        r.firstWeight, r.secondWeight, r.netWeight, r.firstOriginalWeight, r.secondOriginalWeight,
+        r.createdAt, r.firstTime, r.secondTime,
+        r.createdAt ? stamp(new Date(r.createdAt)) : '',
+        r.firstTime ? stamp(new Date(r.firstTime)) : '',
+        r.secondTime ? stamp(new Date(r.secondTime)) : ''
+      ];
+      return values.some(value => String(value ?? '').toLocaleLowerCase('ar').includes(q));
+    });
+  }
+  function deleteRecord(id) {
+    const record = records.find(r => r.id === id);
+    if (!record) return;
+    if (!confirm('هل تريد حذف التذكرة ' + record.id + ' للسيارة ' + record.plate + '؟')) return;
+    records = records.filter(r => r.id !== id);
+    if (activeRecord?.id === id) {
+      activeRecord = null;
+      $('ticketModal').classList.remove('open');
+    }
+    saveRecords();
+    showToast('تم حذف التذكرة ' + id + ' وتحديث ملف Excel');
+  }
+  function deleteAllRecords() {
+    if (!records.length) { showToast('لا توجد سجلات لحذفها'); return; }
+    const count = records.length;
+    if (!confirm('تحذير: سيتم حذف جميع سجلات الوزن (' + count + ' عملية) نهائيًا من البرنامج وملف Excel. هل تريد المتابعة؟')) return;
+    records = [];
+    activeRecord = null;
+    $('ticketModal').classList.remove('open');
+    saveRecords();
+    resetTicket();
+    showToast('تم حذف جميع السجلات وتحديث ملف Excel');
   }
   function renderAll() {
     const today = dateKey(now());
@@ -152,10 +190,9 @@
     $('todayDate').textContent = now().toLocaleDateString('ar-EG',{weekday:'long',year:'numeric',month:'long',day:'numeric'});
   }
   function renderRecords() {
-    const q = ($('recordSearch')?.value || '').trim().toLowerCase();
-    const filtered = records.filter(r => [r.id,r.plate,r.driver,r.customer].some(v=>String(v).toLowerCase().includes(q)));
-    $('recordsTable').innerHTML = filtered.length ? filtered.map(r=>rowMarkup(r,true)).join('') : '<tr class="empty-row"><td colspan="9">لا توجد نتائج مطابقة</td></tr>';
-    $('recordCount').textContent = fmt(filtered.length) + ' عملية';
+    const filtered = searchRecords($('recordSearch')?.value || '');
+    $('recordsTable').innerHTML = filtered.length ? filtered.map(r=>rowMarkup(r,true)).join('') : '<tr class="empty-row"><td colspan="9">'+(records.length ? 'لا توجد سجلات مطابقة للبحث' : 'لا توجد عمليات مسجلة')+'</td></tr>';
+    $('recordCount').textContent = fmt(filtered.length) + ' من أصل ' + fmt(records.length) + ' عملية';
   }
   function renderVehicles() {
     const map = new Map();
@@ -170,14 +207,17 @@
     $('vehiclesTable').innerHTML = vehicles.length ? vehicles.map(v=>'<tr><td>'+esc(v.plate)+'</td><td>'+esc(v.driver)+'</td><td>'+esc(v.customer)+'</td><td>'+fmt(v.count)+'</td><td>'+fmt(v.net)+' كجم</td></tr>').join('') : '<tr class="empty-row"><td colspan="5">لا توجد بيانات بعد</td></tr>';
   }
   function renderReports() {
-    const total = records.reduce((s,r)=>s+r.netWeight,0);
-    $('reportCount').textContent = fmt(records.length);
+    const filtered = searchRecords($('reportSearch')?.value || '');
+    const total = filtered.reduce((s,r)=>s+r.netWeight,0);
+    $('reportCount').textContent = fmt(filtered.length);
     $('reportNet').textContent = fmt(total)+' كجم';
-    $('reportAverage').textContent = fmt(records.length ? Math.round(total/records.length) : 0)+' كجم';
+    $('reportAverage').textContent = fmt(filtered.length ? Math.round(total/filtered.length) : 0)+' كجم';
+    $('reportResultCount').textContent = fmt(filtered.length) + ' نتيجة من أصل ' + fmt(records.length) + ' عملية';
     const days = Array.from({length:7},(_,i)=>{const d=new Date();d.setDate(d.getDate()-(6-i));return d;});
-    const counts = days.map(d=>records.filter(r=>dateKey(new Date(r.createdAt))===dateKey(d)).length);
+    const counts = days.map(d=>filtered.filter(r=>dateKey(new Date(r.createdAt))===dateKey(d)).length);
     const max = Math.max(1,...counts);
-    $('weeklyChart').innerHTML = records.length ? days.map((d,i)=>'<div class="chart-column"><div class="chart-bar" style="height:'+Math.max(4,counts[i]/max*125)+'px"><span>'+counts[i]+'</span></div><small>'+d.toLocaleDateString('ar-EG',{weekday:'short'})+'</small></div>').join('') : '<div class="chart-empty">ستظهر الإحصائيات بعد تسجيل عمليات الوزن.</div>';
+    $('weeklyChart').innerHTML = filtered.length ? days.map((d,i)=>'<div class="chart-column"><div class="chart-bar" style="height:'+Math.max(4,counts[i]/max*125)+'px"><span>'+counts[i]+'</span></div><small>'+d.toLocaleDateString('ar-EG',{weekday:'short'})+'</small></div>').join('') : '<div class="chart-empty">'+(records.length ? 'لا توجد سجلات مطابقة للبحث.' : 'ستظهر الإحصائيات بعد تسجيل عمليات الوزن.')+'</div>';
+    $('reportRecordsTable').innerHTML = filtered.length ? filtered.map(r=>rowMarkup(r,true)).join('') : '<tr class="empty-row"><td colspan="9">'+(records.length ? 'لا توجد نتائج مطابقة للبحث' : 'لا توجد عمليات مسجلة')+'</td></tr>';
   }
   function switchView(name) {
     document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active',v.id==='view-'+name));
@@ -489,6 +529,9 @@
   $('captureWeight').addEventListener('click',capture);
   $('resetTicket').addEventListener('click',resetTicket);
   $('recordSearch').addEventListener('input',renderRecords);
+  $('clearRecordSearch').addEventListener('click',()=>{ $('recordSearch').value=''; renderRecords(); });
+  $('reportSearch').addEventListener('input',renderReports);
+  $('clearReportSearch').addEventListener('click',()=>{ $('reportSearch').value=''; renderReports(); });
   $('exportRecords').addEventListener('click',exportCSV);
   $('exportExcel').addEventListener('click',exportExcel);
   function setExcelSyncStatus(status) {
@@ -687,9 +730,15 @@
   $('closeTicket2').addEventListener('click',()=>$('ticketModal').classList.remove('open'));
   $('printTicket').addEventListener('click',()=>window.print());
   $('ticketModal').addEventListener('click',e=>{if(e.target===$('ticketModal'))$('ticketModal').classList.remove('open');});
-  document.addEventListener('click',e=>{const b=e.target.closest('[data-ticket]');if(b){const r=records.find(x=>x.id===b.dataset.ticket);if(r)openTicket(r);}});
+  document.addEventListener('click',e=>{
+    const deleteButton = e.target.closest('[data-delete-record]');
+    if (deleteButton) { deleteRecord(deleteButton.dataset.deleteRecord); return; }
+    if (e.target.closest('[data-delete-all-records]')) { deleteAllRecords(); return; }
+    const ticketButton = e.target.closest('[data-ticket]');
+    if (ticketButton) { const r=records.find(x=>x.id===ticketButton.dataset.ticket); if(r)openTicket(r); }
+  });
   $('saveSettings').addEventListener('click',()=>{settings.systemName=$('systemName').value.trim()||'Weighbridge 120T';writeJSON(SETTINGS_KEY,settings);document.title=settings.systemName+' | نظام إدارة البسكول';$('settingsMessage').textContent='تم حفظ الإعدادات.';showToast('تم حفظ الإعدادات');});
-  $('clearData').addEventListener('click',()=>{if(!confirm('هل أنت متأكد من مسح كل عمليات الوزن المحفوظة في هذا المتصفح؟ لا يمكن التراجع عن هذه الخطوة.'))return;records=[];saveRecords();resetTicket();showToast('تم مسح بيانات التجربة');});
+  $('clearData').addEventListener('click',deleteAllRecords);
   $('systemName').value=settings.systemName||'Weighbridge 120T';
   setWeight(liveWeight);setStability(true);updateCaptureUI();renderAll();
 })();
