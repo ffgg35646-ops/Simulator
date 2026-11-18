@@ -207,7 +207,7 @@
     const sign = String.fromCharCode(bytes[1]);
     if (sign !== '+' && sign !== '-') return null;
     const digits = bytes.slice(2, 8).map(code => String.fromCharCode(code)).join('');
-    if (!/^\\d{6}$/.test(digits)) return null;
+    if (!/^\d{6}$/.test(digits)) return null;
     const decimalChar = String.fromCharCode(bytes[8]);
     if (!/^[0-4]$/.test(decimalChar)) return null;
     let checksum = 0;
