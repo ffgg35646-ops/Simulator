@@ -15,6 +15,7 @@
   let serialReader = null;
   let serialReading = false;
   let desktopSerialBuffer = '';
+  let autoProbeBuffer = '';
   let autoProbeValue = null;
   let autoProbeRunning = false;
 
@@ -198,6 +199,77 @@
     else if (unit === 'ton') value *= 1000;
     return value;
   }
+  function parseYaohuaA9Frame(frame) {
+    const bytes = Array.from(String(frame || ''), ch => ch.charCodeAt(0) & 0xff);
+    // XK3190-A9+ continuous mode: STX, sign, six ASCII digits, decimal position,
+    // two ASCII XOR hex digits, ETX. Never treat checksum bytes as weight.
+    if (bytes.length !== 12 || bytes[0] !== 0x02 || bytes[11] !== 0x03) return null;
+    const sign = String.fromCharCode(bytes[1]);
+    if (sign !== '+' && sign !== '-') return null;
+    const digits = bytes.slice(2, 8).map(code => String.fromCharCode(code)).join('');
+    if (!/^\\d{6}$/.test(digits)) return null;
+    const decimalChar = String.fromCharCode(bytes[8]);
+    if (!/^[0-4]$/.test(decimalChar)) return null;
+    let checksum = 0;
+    for (let i = 1; i <= 8; i++) checksum ^= bytes[i];
+    const hexDigit = value => String.fromCharCode(value < 10 ? 48 + value : 55 + value);
+    if (String.fromCharCode(bytes[9]) !== hexDigit((checksum >> 4) & 0x0f) ||
+        String.fromCharCode(bytes[10]) !== hexDigit(checksum & 0x0f)) return null;
+    let value = Number(digits) / (10 ** Number(decimalChar));
+    if (sign === '-') value = -value;
+    return Number.isFinite(value) ? value : null;
+  }
+  function extractYaohuaA9Frames(buffer) {
+    const frames = [];
+    const stx = String.fromCharCode(0x02);
+    const etx = String.fromCharCode(0x03);
+    let rest = String(buffer || '');
+    while (rest.length) {
+      const start = rest.indexOf(stx);
+      if (start < 0) return { frames, rest: rest.slice(-1) };
+      if (start > 0) rest = rest.slice(start);
+      const end = rest.indexOf(etx, 1);
+      if (end < 0) return { frames, rest: rest.slice(0, 64) };
+      frames.push(rest.slice(0, end + 1));
+      rest = rest.slice(end + 1);
+    }
+    return { frames, rest: '' };
+  }
+  function applySerialValue(value) {
+    if (value === null || !Number.isFinite(value)) return false;
+    if (value < 0) {
+      $('serialState').textContent = 'قراءة سالبة من المؤشر؛ لم يتم اعتمادها كوزن حمولة.';
+      return false;
+    }
+    setWeight(Math.min(CAPACITY, value));
+    setStability(true);
+    $('serialState').textContent = 'متصل — آخر قراءة: ' + fmt(value) + ' كجم · ' + ($('protocolProfile').selectedOptions[0]?.text || 'Generic');
+    return true;
+  }
+  function consumeDesktopSerialData(data) {
+    if ($('protocolProfile').value === 'yaohua-a9') {
+      desktopSerialBuffer += data;
+      const extracted = extractYaohuaA9Frames(desktopSerialBuffer);
+      desktopSerialBuffer = extracted.rest;
+      for (const frame of extracted.frames) {
+        const value = parseYaohuaA9Frame(frame);
+        if (value !== null) {
+          if (autoProbeRunning) autoProbeValue = value;
+          applySerialValue(value);
+        }
+      }
+      return;
+    }
+    if (autoProbeRunning) {
+      const probeValue = parseSerialWeight(data);
+      if (probeValue !== null) autoProbeValue = probeValue;
+    }
+    desktopSerialBuffer += data;
+    const split = splitSerialFrames(desktopSerialBuffer, $('serialMode').value);
+    desktopSerialBuffer = split.rest;
+    for (const frame of split.frames) applySerialValue(parseSerialWeight(frame));
+    if (desktopSerialBuffer.length > 2048) desktopSerialBuffer = desktopSerialBuffer.slice(-256);
+  }
   async function connectSerial() {
     if (desktop) {
       try {
@@ -280,15 +352,14 @@
           const result = await serialReader.read();
           if (result.done) break;
           buffer += new TextDecoder().decode(result.value);
-          const split = splitSerialFrames(buffer, $('serialMode').value);
-          buffer = split.rest;
-          for (const frame of split.frames) {
-            const value = parseSerialWeight(frame);
-            if (value !== null) {
-              setWeight(Math.min(CAPACITY, value));
-              setStability(true);
-              $('serialState').textContent = 'متصل — آخر قراءة: ' + fmt(value) + ' كجم · ' + ($('protocolProfile').selectedOptions[0]?.text || 'Generic');
-            }
+          if ($('protocolProfile').value === 'yaohua-a9') {
+            const extracted = extractYaohuaA9Frames(buffer);
+            buffer = extracted.rest;
+            for (const frame of extracted.frames) applySerialValue(parseYaohuaA9Frame(frame));
+          } else {
+            const split = splitSerialFrames(buffer, $('serialMode').value);
+            buffer = split.rest;
+            for (const frame of split.frames) applySerialValue(parseSerialWeight(frame));
           }
           if (buffer.length > 2048) buffer = buffer.slice(-256);
         }
@@ -400,6 +471,8 @@
           try {
             await window.desktopBridge.closeSerialPort();
             autoProbeValue = null;
+            autoProbeBuffer = '';
+            desktopSerialBuffer = '';
             await window.desktopBridge.openSerialPort({ path, ...config });
             serialPort = { desktop: true };
             serialReading = true;
@@ -431,28 +504,21 @@
     $('usbHelp').addEventListener('click', () => { refreshPorts(); showToast('محولات USB-to-Serial تظهر هنا كمنفذ COM.'); });
     $('protocolProfile').addEventListener('change', () => {
       const profile = $('protocolProfile').value;
-      if (profile === 'stx-etx') $('serialMode').value = 'stx';
+      if (profile === 'yaohua-a9') {
+        $('serialMode').value = 'yaohua-a9';
+        $('serialBaud').value = '9600';
+        $('serialDataBits').value = '8';
+        $('serialParity').value = 'none';
+        $('serialStopBits').value = '1';
+        $('serialFlow').value = 'none';
+        $('serialUnit').value = 'kg';
+        $('serialState').textContent = 'ملف YAOHUA جاهز. تأكد أن المؤشر مضبوط على tF=0 (إرسال مستمر) ونفس سرعة Baud.';
+      } else if (profile === 'stx-etx') $('serialMode').value = 'stx';
       else if (profile === 'raw-stream') $('serialMode').value = 'continuous';
       else if (['rice-continuous','rice-demand','mettler','avery','cas','generic'].includes(profile)) $('serialMode').value = 'lines';
     });
     refreshPorts();
-    window.desktopBridge.onSerialData(data => {
-      if (autoProbeRunning) {
-        const probeValue = parseSerialWeight(data);
-        if (probeValue !== null) autoProbeValue = probeValue;
-      }
-      desktopSerialBuffer += data;
-      const split = splitSerialFrames(desktopSerialBuffer, $('serialMode').value);
-      desktopSerialBuffer = split.rest;
-      for (const frame of split.frames) {
-        const value = parseSerialWeight(frame);
-        if (value !== null) {
-          setWeight(Math.min(CAPACITY, value)); setStability(true);
-          $('serialState').textContent = 'متصل — آخر قراءة: ' + fmt(value) + ' كجم · ' + ($('protocolProfile').selectedOptions[0]?.text || 'Generic');
-        }
-      }
-      if (desktopSerialBuffer.length > 2048) desktopSerialBuffer = desktopSerialBuffer.slice(-256);
-    });
+    window.desktopBridge.onSerialData(data => consumeDesktopSerialData(data));
     window.desktopBridge.onSerialError(error => { $('serialState').textContent = 'خطأ في منفذ COM: ' + error; });
     window.desktopBridge.onSerialClosed(() => {
       serialPort = null; serialReading = false;
