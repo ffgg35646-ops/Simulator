@@ -790,6 +790,7 @@
         lastPortsSignature = signature;
 
         if (serialPort?.path && !ports.some(port => port.path === serialPort.path) && !autoScanAttemptActive) {
+          autoRetryAt = 0;
           serialPort = null;
           serialReading = false;
           activeWeightSource = 'waiting';
@@ -849,6 +850,7 @@
       serialPort = null;
       serialReading = false;
       if ($('weightMode').value !== 'manual') activeWeightSource = 'waiting';
+      if (autoDetectionEnabled) autoRetryAt = 0;
       $('serialConnect').disabled = false;
       $('serialDisconnect').disabled = true;
       $('connectionSummary').textContent = 'غير متصل';
