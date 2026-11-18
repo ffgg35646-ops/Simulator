@@ -5,8 +5,9 @@
   const CAPACITY = 120000;
   let records = readJSON(STORAGE_KEY, []);
   let settings = readJSON(SETTINGS_KEY, { systemName: 'Weighbridge 120T' });
-  let liveWeight = 25660;
+  let liveWeight = 0;
   let isStable = true;
+  let activeWeightSource = "manual";
   let firstCapture = null;
   let secondCapture = null;
   let activeRecord = null;
@@ -45,8 +46,8 @@
   function setWeight(value) {
     liveWeight = Math.max(0, Math.min(CAPACITY, Math.round(Number(value) * 100) / 100));
     $('liveWeight').innerHTML = fmt(liveWeight) + '<span>كجم</span>';
-    $('weightSlider').value = liveWeight;
-    $('sliderValue').textContent = fmt(liveWeight) + ' كجم';
+    $('manualWeight').value = activeWeightSource === 'manual' ? liveWeight : '';
+    $('weightSourceLabel').textContent = activeWeightSource === 'serial' ? 'قراءة من الميزان' : activeWeightSource === 'manual' ? 'إدخال يدوي' : 'بانتظار القراءة';
     const percent = liveWeight / CAPACITY * 100;
     $('capacityFill').style.width = percent + '%';
     $('capacityPercent').textContent = percent.toFixed(2) + '% من السعة';
@@ -58,14 +59,14 @@
     const el = $('stableIndicator');
     el.classList.toggle('unstable', !isStable);
     el.innerHTML = '<i></i> ' + (isStable ? 'وزن مستقر' : 'الوزن متغير');
-    $('toggleStability').textContent = isStable ? 'جعل الوزن متغيرًا' : 'تثبيت الوزن';
+
   }
   function capture() {
     if (!isStable) { $('formMessage').textContent = 'لا يمكن تسجيل الوزن قبل استقرار القراءة.'; return; }
     if (liveWeight > CAPACITY) { $('formMessage').textContent = 'الوزن يتجاوز السعة القصوى.'; return; }
     const plate = $('plateInput').value.trim();
     if (!plate) { $('formMessage').textContent = 'اكتب رقم السيارة أولًا.'; $('plateInput').focus(); return; }
-    const captureData = { weight: liveWeight, time: now().toISOString() };
+    const captureData = { weight: liveWeight, time: now().toISOString(), source: activeWeightSource };
     if (!firstCapture) {
       firstCapture = captureData;
       $('formMessage').textContent = 'تم تسجيل الوزنة الأولى. سجّل الوزنة الثانية بعد تغيير قراءة الميزان.';
@@ -81,7 +82,7 @@
         customer: $('customerInput').value.trim() || '—',
         firstWeight: firstCapture.weight, secondWeight: secondCapture.weight,
         netWeight: net, firstTime: firstCapture.time, secondTime: secondCapture.time,
-        createdAt: now().toISOString(), source: serialPort ? 'RS232 / USB Serial' : 'SIMULATOR'
+        createdAt: now().toISOString(), source: [firstCapture.source, secondCapture.source].every(s => s === 'serial') ? 'RS232 / USB Serial' : [firstCapture.source, secondCapture.source].every(s => s === 'manual') ? 'إدخال يدوي' : 'مختلط: قراءة ميزان / إدخال يدوي'
       };
       records.unshift(record); activeRecord = record; saveRecords();
       $('formMessage').textContent = 'اكتملت عملية الوزن وحُفظت التذكرة بنجاح.';
@@ -133,7 +134,10 @@
     $('todayCount').textContent = fmt(todays.length);
     $('todayNet').innerHTML = fmt(todayNet) + ' <em>كجم</em>';
     $('lastWeighing').textContent = records.length ? stamp(new Date(records[0].createdAt)) : '—';
-    $('connectionSummary').textContent = serialPort ? 'متصل Serial' : 'محاكاة';
+    $('connectionSummary').textContent = serialPort ? 'متصل Serial' : 'غير متصل';
+    $('sidebarDeviceStatus').textContent = serialPort ? 'الميزان متصل' : 'بانتظار توصيل الميزان';
+    $('deviceConnectionText').textContent = serialPort ? 'متصل ويستقبل بيانات الوزن' : 'غير متصل — يمكنك استخدام الإدخال اليدوي';
+    $('deviceConnectionMark').textContent = serialPort ? '✓' : '—';
     $('recentTable').innerHTML = records.length ? records.slice(0,5).map(r=>rowMarkup(r)).join('') : '<tr class="empty-row"><td colspan="7">لا توجد عمليات مسجلة حتى الآن</td></tr>';
     renderRecords();
     renderVehicles();
@@ -241,6 +245,8 @@
       $('serialState').textContent = 'قراءة سالبة من المؤشر؛ لم يتم اعتمادها كوزن حمولة.';
       return false;
     }
+    if ($('weightMode').value === 'manual') return false;
+    activeWeightSource = 'serial';
     setWeight(Math.min(CAPACITY, value));
     setStability(true);
     $('serialState').textContent = 'متصل — آخر قراءة: ' + fmt(value) + ' كجم · ' + ($('protocolProfile').selectedOptions[0]?.text || 'Generic');
@@ -378,8 +384,11 @@
       serialPort = null;
       $('serialConnect').disabled = false;
       $('serialDisconnect').disabled = true;
-      $('serialState').textContent = 'غير متصل — وضع المحاكاة نشط';
-      $('connectionSummary').textContent = 'محاكاة';
+      $('serialState').textContent = 'غير متصل — يمكنك إدخال الوزن يدويًا';
+      $('connectionSummary').textContent = 'غير متصل';
+      $('sidebarDeviceStatus').textContent = 'بانتظار توصيل الميزان';
+      $('deviceConnectionText').textContent = 'غير متصل — يمكنك استخدام الإدخال اليدوي';
+      $('deviceConnectionMark').textContent = '—';
       showToast('تم قطع الاتصال بالميزان');
       return;
     }
@@ -389,8 +398,11 @@
     serialReader = null;
     $('serialConnect').disabled = false;
     $('serialDisconnect').disabled = true;
-    $('serialState').textContent = 'غير متصل — وضع المحاكاة نشط';
-    $('connectionSummary').textContent = 'محاكاة';
+    $('serialState').textContent = 'غير متصل — يمكنك إدخال الوزن يدويًا';
+    $('connectionSummary').textContent = 'غير متصل';
+    $('sidebarDeviceStatus').textContent = 'بانتظار توصيل الميزان';
+    $('deviceConnectionText').textContent = 'غير متصل — يمكنك استخدام الإدخال اليدوي';
+    $('deviceConnectionMark').textContent = '—';
     showToast('تم قطع الاتصال بالميزان');
   }
   function exportExcel() {
@@ -423,11 +435,30 @@
   document.querySelectorAll('[data-view]').forEach(b=>b.addEventListener('click',()=>switchView(b.dataset.view)));
   document.querySelectorAll('[data-go]').forEach(b=>b.addEventListener('click',()=>switchView(b.dataset.go)));
   $('mobileMenu').addEventListener('click',()=>$('sidebar').classList.toggle('open'));
-  $('weightSlider').addEventListener('input',e=>setWeight(e.target.value));
-  $('zeroWeight').addEventListener('click',()=>{setWeight(0);showToast('تم تصفير قراءة المحاكي');});
-  $('presetLoaded').addEventListener('click',()=>{setWeight(25660);setStability(true);});
-  $('presetEmpty').addEventListener('click',()=>{setWeight(10200);setStability(true);});
-  $('toggleStability').addEventListener('click',()=>setStability(!isStable));
+  $('applyManualWeight').addEventListener('click',()=>{
+    const raw = $('manualWeight').value;
+    const value = Number(raw);
+    if (raw === '' || !Number.isFinite(value) || value < 0 || value > CAPACITY) {
+      showToast('أدخل وزنًا صحيحًا من 0 إلى 120,000 كجم'); return;
+    }
+    $('weightMode').value = 'manual';
+    activeWeightSource = 'manual';
+    setWeight(value);
+    setStability(true);
+    $('formMessage').textContent = 'تم اعتماد الوزن يدويًا.';
+    showToast('تم اعتماد الوزن اليدوي');
+  });
+  $('weightMode').addEventListener('change',()=>{
+    if ($('weightMode').value === 'manual') {
+      activeWeightSource = 'manual';
+      $('formMessage').textContent = 'وضع الإدخال اليدوي مفعل. قراءة الكابل لن تغيّر الوزن الحالي.';
+      $('manualWeight').value = liveWeight;
+    } else {
+      activeWeightSource = serialPort ? 'serial' : 'manual';
+      $('formMessage').textContent = serialPort ? 'تم تفعيل القراءة التلقائية من الميزان.' : 'وضع التلقائي مفعل؛ وصّل الميزان لقراءة الوزن.';
+    }
+    $('weightSourceLabel').textContent = activeWeightSource === 'serial' ? 'قراءة من الميزان' : 'إدخال يدوي';
+  });
   $('captureWeight').addEventListener('click',capture);
   $('resetTicket').addEventListener('click',resetTicket);
   $('recordSearch').addEventListener('input',renderRecords);
