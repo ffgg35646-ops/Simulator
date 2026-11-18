@@ -6,6 +6,7 @@
   let records = readJSON(STORAGE_KEY, []);
   let settings = readJSON(SETTINGS_KEY, { systemName: 'Weighbridge 120T' });
   let liveWeight = 0;
+  let rawScaleWeight = null;
   let isStable = true;
   let activeWeightSource = "waiting";
   let firstCapture = null;
@@ -46,7 +47,7 @@
   function setWeight(value) {
     liveWeight = Math.max(0, Math.min(CAPACITY, Math.round(Number(value) * 100) / 100));
     $('liveWeight').innerHTML = fmt(liveWeight) + '<span>كجم</span>';
-    $('manualWeight').value = activeWeightSource === 'manual' ? liveWeight : '';
+    if (document.activeElement !== $('manualWeight')) $('manualWeight').value = liveWeight;
     $('weightSourceLabel').textContent = activeWeightSource === 'serial' ? 'قراءة من الميزان' : activeWeightSource === 'manual' ? 'إدخال يدوي' : 'بانتظار القراءة';
     const percent = liveWeight / CAPACITY * 100;
     $('capacityFill').style.width = percent + '%';
@@ -67,7 +68,9 @@
     if (liveWeight > CAPACITY) { $('formMessage').textContent = 'الوزن يتجاوز السعة القصوى.'; return; }
     const plate = $('plateInput').value.trim();
     if (!plate) { $('formMessage').textContent = 'اكتب رقم السيارة أولًا.'; $('plateInput').focus(); return; }
-    const captureData = { weight: liveWeight, time: now().toISOString(), source: activeWeightSource };
+    const originalWeight = rawScaleWeight == null ? null : Math.round(Number(rawScaleWeight) * 100) / 100;
+    const captureData = { weight: liveWeight, originalWeight, adjusted: originalWeight != null && Math.abs(originalWeight - liveWeight) > 0.005, time: now().toISOString(), source: activeWeightSource };
+    rawScaleWeight = null;
     if (!firstCapture) {
       firstCapture = captureData;
       $('formMessage').textContent = 'تم تسجيل الوزنة الأولى. سجّل الوزنة الثانية بعد تغيير قراءة الميزان.';
@@ -82,6 +85,9 @@
         id: ticketNo(), plate, driver: $('driverInput').value.trim() || '—',
         customer: $('customerInput').value.trim() || '—',
         firstWeight: firstCapture.weight, secondWeight: secondCapture.weight,
+        firstOriginalWeight: firstCapture.originalWeight, secondOriginalWeight: secondCapture.originalWeight,
+        firstAdjusted: firstCapture.adjusted, secondAdjusted: secondCapture.adjusted,
+        firstSource: firstCapture.source, secondSource: secondCapture.source,
         netWeight: net, firstTime: firstCapture.time, secondTime: secondCapture.time,
         createdAt: now().toISOString(), source: [firstCapture.source, secondCapture.source].every(s => s === 'serial') ? 'RS232 / USB Serial' : [firstCapture.source, secondCapture.source].every(s => s === 'manual') ? 'إدخال يدوي' : 'مختلط: قراءة ميزان / إدخال يدوي'
       };
@@ -248,7 +254,8 @@
     }
     if ($('weightMode').value === 'manual') return false;
     activeWeightSource = 'serial';
-    setWeight(Math.min(CAPACITY, value));
+    rawScaleWeight = Math.min(CAPACITY, value);
+    setWeight(rawScaleWeight);
     setStability(true);
     $('serialState').textContent = 'متصل — آخر قراءة: ' + fmt(value) + ' كجم · ' + ($('protocolProfile').selectedOptions[0]?.text || 'Generic');
     return true;
@@ -406,17 +413,35 @@
     $('deviceConnectionMark').textContent = '—';
     showToast('تم قطع الاتصال بالميزان');
   }
-  function exportExcel() {
+  async function exportExcel() {
     if (!records.length) { showToast('لا توجد عمليات لتصديرها'); return; }
+    if (desktop && window.desktopBridge?.exportExcel) {
+      try {
+        const result = await window.desktopBridge.exportExcel(records);
+        if (!result.canceled) showToast('تم تصدير ملف Excel إلى: ' + result.path);
+      } catch (error) { showToast('تعذر تصدير Excel: ' + error.message); }
+      return;
+    }
     if (!window.XLSX) { showToast('مكتبة Excel لم تُحمّل. تحقق من اتصال الإنترنت.'); return; }
-    const rows = records.slice().reverse().map(r => ({
-      'رقم التذكرة': r.id, 'رقم السيارة': r.plate, 'السائق': r.driver, 'العميل': r.customer,
-      'الوزنة الأولى (كجم)': r.firstWeight, 'الوزنة الثانية (كجم)': r.secondWeight,
-      'صافي الحمولة (كجم)': r.netWeight, 'مصدر القراءة': r.source,
-      'تاريخ العملية': stamp(new Date(r.createdAt))
-    }));
+    const rows = records.slice().reverse().map(r => {
+      const original1 = Object.prototype.hasOwnProperty.call(r, 'firstOriginalWeight') ? r.firstOriginalWeight : r.firstWeight;
+      const original2 = Object.prototype.hasOwnProperty.call(r, 'secondOriginalWeight') ? r.secondOriginalWeight : r.secondWeight;
+      return {
+        'رقم التذكرة': r.id, 'رقم السيارة': r.plate, 'السائق': r.driver, 'العميل': r.customer,
+        'قراءة الأولى الأصلية (كجم)': original1 == null ? 'إدخال يدوي' : original1,
+        'الوزن الأول المعتمد (كجم)': r.firstWeight,
+        'فرق تعديل الأولى (كجم)': original1 == null ? '' : Number((r.firstWeight - original1).toFixed(2)),
+        'قراءة الثانية الأصلية (كجم)': original2 == null ? 'إدخال يدوي' : original2,
+        'الوزن الثاني المعتمد (كجم)': r.secondWeight,
+        'فرق تعديل الثانية (كجم)': original2 == null ? '' : Number((r.secondWeight - original2).toFixed(2)),
+        'صافي الحمولة (كجم)': r.netWeight, 'مصدر الأولى': r.firstSource || r.source,
+        'مصدر الثانية': r.secondSource || r.source,
+        'وقت الوزنة الأولى': r.firstTime || '', 'وقت الوزنة الثانية': r.secondTime || '',
+        'تاريخ العملية': stamp(new Date(r.createdAt))
+      };
+    });
     const sheet = XLSX.utils.json_to_sheet(rows);
-    sheet['!cols'] = [{wch:22},{wch:18},{wch:20},{wch:24},{wch:20},{wch:20},{wch:22},{wch:22},{wch:24}];
+    sheet['!cols'] = Object.keys(rows[0]).map(() => ({ wch: 23 }));
     const book = XLSX.utils.book_new();
     XLSX.utils.book_append_sheet(book, sheet, 'سجل الوزن');
     XLSX.writeFile(book, 'Weighbridge-120T-Records-' + dateKey(now()) + '.xlsx');
@@ -456,6 +481,7 @@
       $('manualWeight').value = liveWeight;
     } else {
       activeWeightSource = 'waiting';
+      rawScaleWeight = null;
       $('formMessage').textContent = serialPort ? 'تم تفعيل القراءة التلقائية؛ انتظر القراءة التالية من الميزان.' : 'وضع التلقائي مفعل؛ وصّل الميزان لقراءة الوزن.';
     }
     $('weightSourceLabel').textContent = activeWeightSource === 'serial' ? 'قراءة من الميزان' : activeWeightSource === 'manual' ? 'إدخال يدوي' : 'بانتظار القراءة';
@@ -465,6 +491,55 @@
   $('recordSearch').addEventListener('input',renderRecords);
   $('exportRecords').addEventListener('click',exportCSV);
   $('exportExcel').addEventListener('click',exportExcel);
+  function setExcelSyncStatus(status) {
+    const target = $('excelSyncStatus');
+    if (!target) return;
+    if (!desktop) {
+      target.textContent = 'نسخة الويب: استخدم «تصدير Excel» لتنزيل السجل. الحفظ التلقائي في ملف Excel متاح في نسخة Windows.';
+      target.classList.remove('is-error');
+      return;
+    }
+    if (!status) {
+      target.textContent = 'جارٍ تجهيز ملف Excel المرتبط...';
+      return;
+    }
+    target.textContent = status.ok
+      ? 'مرتبط ويحفظ تلقائيًا · ' + status.path + ' · ' + fmt(status.count) + ' عملية'
+      : 'تعذر تحديث ملف Excel: ' + (status.error || 'خطأ غير معروف');
+    target.classList.toggle('is-error', !status.ok);
+    target.title = status.path || '';
+  }
+  async function refreshExcelSyncStatus() {
+    if (!desktop) {
+      setExcelSyncStatus(null);
+      $('chooseExcelFile').disabled = true;
+      $('openExcelFile').disabled = true;
+      return;
+    }
+    try { setExcelSyncStatus(await window.desktopBridge.getExcelStatus()); }
+    catch (error) { setExcelSyncStatus({ ok: false, error: error.message }); }
+  }
+  $('chooseExcelFile').addEventListener('click', async () => {
+    try {
+      const result = await window.desktopBridge.chooseExcelFile();
+      if (!result.canceled) {
+        setExcelSyncStatus(result);
+        showToast('تم ربط ملف Excel وسيتم تحديثه تلقائيًا');
+      }
+    } catch (error) { showToast('تعذر ربط ملف Excel: ' + error.message); }
+  });
+  $('openExcelFile').addEventListener('click', async () => {
+    try {
+      const result = await window.desktopBridge.openExcelFile();
+      showToast('تم فتح ملف Excel: ' + result.path);
+    } catch (error) { showToast('تعذر فتح ملف Excel: ' + error.message); }
+  });
+  if (desktop) {
+    window.desktopBridge.onExcelSyncStatus(setExcelSyncStatus);
+    refreshExcelSyncStatus();
+  } else {
+    setExcelSyncStatus(null);
+  }
   $('serialConnect').addEventListener('click',connectSerial);
   $('serialDisconnect').addEventListener('click',disconnectSerial);
 
@@ -584,7 +659,11 @@
     window.desktopBridge.onTcpData(data => {
       const value = parseSerialWeight(data);
       if (value !== null) {
-        setWeight(Math.min(CAPACITY, value)); setStability(true);
+        if ($('weightMode').value !== 'manual') {
+          activeWeightSource = 'serial';
+          rawScaleWeight = Math.min(CAPACITY, value);
+          setWeight(rawScaleWeight); setStability(true);
+        }
         $('tcpState').textContent = 'متصل — آخر قراءة: ' + fmt(value) + ' كجم';
       }
     });
