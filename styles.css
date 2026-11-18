@@ -9,3 +9,5 @@
 
 .record-actions{display:flex;gap:9px;flex-wrap:wrap}.serial-controls{margin-top:14px;display:grid;gap:12px}.serial-controls label{display:grid;gap:6px;color:var(--muted);font-size:11px}.serial-controls select{width:100%;background:#0b1720;border:1px solid var(--line);border-radius:9px;color:var(--text);padding:10px;font:inherit}.serial-buttons{display:flex;gap:8px;flex-wrap:wrap}.serial-buttons .btn{flex:1}.protocol-card .protocol-state{margin:15px 0 10px}.protocol-card .btn:disabled{opacity:.55;cursor:not-allowed}
 @media(max-width:700px){.record-actions{width:100%}.record-actions .btn{flex:1}.serial-buttons{flex-direction:column}}
+
+.excel-sync-status{display:block;max-width:min(760px,100%);margin-top:7px;color:#58d6c5;font-size:10px;line-height:1.8;overflow-wrap:anywhere}.excel-sync-status.is-error{color:#f1a0a0}.record-actions{align-items:center}
