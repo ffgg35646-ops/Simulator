@@ -184,9 +184,9 @@
     $('todayCount').textContent = fmt(todays.length);
     $('todayNet').innerHTML = fmt(todayNet) + ' <em>كجم</em>';
     $('lastWeighing').textContent = records.length ? stamp(new Date(records[0].createdAt)) : '—';
-    $('connectionSummary').textContent = serialPort ? 'متصل Serial' : 'غير متصل';
-    $('sidebarDeviceStatus').textContent = serialPort ? 'الميزان متصل' : 'بانتظار توصيل الميزان';
-    $('deviceConnectionText').textContent = serialPort ? 'متصل ويستقبل بيانات الوزن' : 'غير متصل — يمكنك استخدام الإدخال اليدوي';
+    $('connectionSummary').textContent = serialPort ? (serialPort.auto ? 'متصل تلقائيًا' : 'متصل Serial') : 'غير متصل';
+    $('sidebarDeviceStatus').textContent = serialPort ? (serialPort.auto ? 'تم التعرف على الميزان تلقائيًا' : 'الميزان متصل') : 'بانتظار توصيل الميزان';
+    $('deviceConnectionText').textContent = serialPort ? (serialPort.auto ? 'متصل تلقائيًا عبر ' + (serialPort.path || 'USB/COM') : 'متصل ويستقبل بيانات الوزن') : 'غير متصل — يمكنك استخدام الإدخال اليدوي';
     $('deviceConnectionMark').textContent = serialPort ? '✓' : '—';
     $('recentTable').innerHTML = records.length ? records.slice(0,5).map(r=>rowMarkup(r)).join('') : '<tr class="empty-row"><td colspan="7">لا توجد عمليات مسجلة حتى الآن</td></tr>';
     renderRecords();
@@ -341,7 +341,7 @@
       autoScanBuffer = autoScanBuffer.slice(end + 1);
     }
 
-    const chunks = autoScanBuffer.split(/[\\r\\n]+/);
+    const chunks = autoScanBuffer.split(/[\r\n]+/);
     autoScanBuffer = chunks.pop() || '';
     chunks.forEach(inspectAutoScanLine);
 
@@ -850,6 +850,7 @@
       if (autoScanAttemptActive) return;
       serialPort = null;
       serialReading = false;
+      if ($('weightMode').value !== 'manual') activeWeightSource = 'waiting';
       $('serialConnect').disabled = false;
       $('serialDisconnect').disabled = true;
       $('connectionSummary').textContent = 'غير متصل';
