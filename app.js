@@ -7,7 +7,7 @@
   let settings = readJSON(SETTINGS_KEY, { systemName: 'Weighbridge 120T' });
   let liveWeight = 0;
   let isStable = true;
-  let activeWeightSource = "manual";
+  let activeWeightSource = "waiting";
   let firstCapture = null;
   let secondCapture = null;
   let activeRecord = null;
@@ -62,6 +62,7 @@
 
   }
   function capture() {
+    if (activeWeightSource === 'waiting') { $('formMessage').textContent = 'اختر الإدخال اليدوي أو وصّل الميزان وانتظر أول قراءة.'; return; }
     if (!isStable) { $('formMessage').textContent = 'لا يمكن تسجيل الوزن قبل استقرار القراءة.'; return; }
     if (liveWeight > CAPACITY) { $('formMessage').textContent = 'الوزن يتجاوز السعة القصوى.'; return; }
     const plate = $('plateInput').value.trim();
@@ -454,10 +455,10 @@
       $('formMessage').textContent = 'وضع الإدخال اليدوي مفعل. قراءة الكابل لن تغيّر الوزن الحالي.';
       $('manualWeight').value = liveWeight;
     } else {
-      activeWeightSource = serialPort ? 'serial' : 'manual';
-      $('formMessage').textContent = serialPort ? 'تم تفعيل القراءة التلقائية من الميزان.' : 'وضع التلقائي مفعل؛ وصّل الميزان لقراءة الوزن.';
+      activeWeightSource = 'waiting';
+      $('formMessage').textContent = serialPort ? 'تم تفعيل القراءة التلقائية؛ انتظر القراءة التالية من الميزان.' : 'وضع التلقائي مفعل؛ وصّل الميزان لقراءة الوزن.';
     }
-    $('weightSourceLabel').textContent = activeWeightSource === 'serial' ? 'قراءة من الميزان' : 'إدخال يدوي';
+    $('weightSourceLabel').textContent = activeWeightSource === 'serial' ? 'قراءة من الميزان' : activeWeightSource === 'manual' ? 'إدخال يدوي' : 'بانتظار القراءة';
   });
   $('captureWeight').addEventListener('click',capture);
   $('resetTicket').addEventListener('click',resetTicket);
