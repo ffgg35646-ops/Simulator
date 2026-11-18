@@ -4,7 +4,7 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta name="theme-color" content="#101820" />
-  <meta name="description" content="Weighbridge 120T — محاكي وإدارة ميزان الشاحنات" />
+  <meta name="description" content="Weighbridge 120T — نظام إدارة وقراءة أوزان الشاحنات" />
   <title>Weighbridge 120T | نظام إدارة البسكول</title>
   <link rel="stylesheet" href="./styles.css" />
 </head>
@@ -25,7 +25,7 @@
         <button class="nav-link" data-view="settings"><span class="nav-icon">⚙</span> الإعدادات</button>
       </nav>
       <div class="sidebar-bottom">
-        <div class="opensource-card"><span class="pulse-dot"></span><div><strong>وضع المحاكاة</strong><small>لا يوجد ميزان حقيقي متصل</small></div></div>
+        <div class="opensource-card"><span class="pulse-dot"></span><div><strong>نظام الوزن</strong><small id="sidebarDeviceStatus">بانتظار توصيل الميزان</small></div></div>
         <div class="sidebar-foot">WEIGHBRIDGE 120T <span>الإصدار 0.1.0</span></div>
       </div>
     </aside>
@@ -42,24 +42,24 @@
           <article class="stat-card"><div class="stat-icon teal">▤</div><div><span>عمليات اليوم</span><strong id="todayCount">0</strong><small>إجمالي التذاكر المسجلة</small></div></article>
           <article class="stat-card"><div class="stat-icon blue">▰</div><div><span>إجمالي صافي الوزن اليوم</span><strong id="todayNet">0 <em>كجم</em></strong><small>مجموع الحمولات الصافية</small></div></article>
           <article class="stat-card"><div class="stat-icon amber">◷</div><div><span>آخر عملية وزن</span><strong id="lastWeighing">—</strong><small>آخر تذكرة محفوظة</small></div></article>
-          <article class="stat-card"><div class="stat-icon purple">⌁</div><div><span>حالة الاتصال</span><strong class="status-text" id="connectionSummary">محاكاة</strong><small>مصدر قراءة الوزن الحالي</small></div></article>
+          <article class="stat-card"><div class="stat-icon purple">⌁</div><div><span>حالة الاتصال</span><strong class="status-text" id="connectionSummary">غير متصل</strong><small>مصدر قراءة الوزن الحالي</small></div></article>
         </div>
 
         <div class="work-grid">
           <section class="panel scale-panel">
             <div class="panel-heading"><div><span class="eyebrow">LIVE SCALE</span><h3>قراءة الوزن المباشر</h3></div><span class="live-badge"><i></i> مباشر تجريبي</span></div>
             <div class="weight-display">
-              <div class="weight-caption">الوزن الحالي</div>
-              <div class="weight-value" id="liveWeight">25,660<span>كجم</span></div>
+              <div class="weight-caption">الوزن الحالي · <span id="weightSourceLabel">إدخال يدوي</span></div>
+              <div class="weight-value" id="liveWeight">0<span>كجم</span></div>
               <div class="weight-meta"><span class="stable-indicator" id="stableIndicator"><i></i> وزن مستقر</span><span>السعة القصوى 120,000 كجم</span></div>
               <div class="capacity-track"><div id="capacityFill" style="width:21.38%"></div></div>
               <div class="capacity-labels"><span>0 كجم</span><strong id="capacityPercent">21.38% من السعة</strong><span>120 طن</span></div>
             </div>
-            <div class="simulator-box">
-              <div class="simulator-head"><div><strong>لوحة محاكاة الوزن</strong><small>غيّر القراءة لاختبار النظام</small></div><span class="sim-tag">SIMULATOR</span></div>
-              <input id="weightSlider" type="range" min="0" max="120000" step="10" value="25660" />
-              <div class="range-labels"><span>صفر</span><span id="sliderValue">25,660 كجم</span><span>120 طن</span></div>
-              <div class="sim-actions"><button class="btn btn-quiet" id="zeroWeight">تصفير الميزان</button><button class="btn btn-quiet" id="presetLoaded">شاحنة محمّلة</button><button class="btn btn-quiet" id="presetEmpty">شاحنة فارغة</button><button class="btn btn-primary" id="toggleStability">تغيير حالة الثبات</button></div>
+            <div class="manual-entry">
+              <div class="manual-entry-head"><div><strong>إدخال الوزن يدويًا</strong><small>اكتب الوزن بالكيلوجرام ثم اضغط اعتماد الوزن</small></div><span class="sim-tag">MANUAL</span></div>
+              <div class="manual-weight-row"><input id="manualWeight" type="number" min="0" max="120000" step="0.01" placeholder="أدخل الوزن بالكيلوجرام" inputmode="decimal" /><button class="btn btn-primary" id="applyManualWeight" type="button">اعتماد الوزن</button></div>
+              <p class="manual-note">يمكنك التبديل بين القراءة التلقائية من الميزان والإدخال اليدوي من اختيار مصدر الوزن.</p>
+              <label class="weight-mode-label">مصدر الوزن<select id="weightMode"><option value="auto" selected>تلقائي — من الميزان المتصل</option><option value="manual">يدوي — إدخال الوزن بنفسك</option></select></label>
             </div>
             <div class="capture-area">
               <div class="capture-title"><div><strong>تسجيل عملية وزن</strong><small>التذكرة تتكون من وزنتين لنفس السيارة</small></div><span class="step-pill" id="weighStep">الوزنة الأولى</span></div>
@@ -80,7 +80,7 @@
           </section>
 
           <aside class="right-column">
-            <section class="panel connection-panel"><div class="panel-heading"><div><span class="eyebrow">DEVICE LINK</span><h3>مصدر قراءة الوزن</h3></div><span class="mini-status">تجريبي</span></div><div class="connection-option active"><span class="connection-symbol">⌁</span><div><strong>محاكي داخلي</strong><small>يولّد قراءات وزن افتراضية</small></div><span class="check-mark">✓</span></div><div class="connection-option"><span class="connection-symbol">⇄</span><div><strong>RS232 / USB</strong><small>بانتظار تعريف مؤشر الوزن</small></div><span class="lock-mark">—</span></div><div class="connection-option"><span class="connection-symbol">⌘</span><div><strong>Ethernet TCP/IP</strong><small>بانتظار عنوان الجهاز والبروتوكول</small></div><span class="lock-mark">—</span></div><button class="btn btn-outline btn-block" data-go="connections">إعدادات الاتصال</button></section>
+            <section class="panel connection-panel"><div class="panel-heading"><div><span class="eyebrow">DEVICE LINK</span><h3>حالة اتصال الميزان</h3></div><span class="mini-status">اتصال فعلي</span></div><div class="connection-option"><span class="connection-symbol">⇄</span><div><strong>RS232 / USB Serial</strong><small id="deviceConnectionText">غير متصل — يمكنك استخدام الإدخال اليدوي</small></div><span class="lock-mark" id="deviceConnectionMark">—</span></div><div class="connection-option"><span class="connection-symbol">⌘</span><div><strong>Ethernet TCP/IP</strong><small>اتصال شبكي مباشر عند توفر إعدادات الجهاز</small></div><span class="lock-mark">—</span></div><button class="btn btn-outline btn-block" data-go="connections">إعدادات الاتصال</button></section>
             <section class="panel quick-panel"><div class="panel-heading"><div><span class="eyebrow">QUICK ACCESS</span><h3>اختصارات سريعة</h3></div></div><button class="quick-link" data-go="weighings"><span>▤</span> عرض سجل الوزن <b>←</b></button><button class="quick-link" data-go="reports"><span>▥</span> التقارير والإحصائيات <b>←</b></button><button class="quick-link" id="exportQuick"><span>⇩</span> تصدير سجل العمليات <b>←</b></button></section>
           </aside>
         </div>
