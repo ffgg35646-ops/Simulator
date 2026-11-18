@@ -17,9 +17,14 @@
   let serialReader = null;
   let serialReading = false;
   let desktopSerialBuffer = '';
-  let autoProbeBuffer = '';
-  let autoProbeValue = null;
-  let autoProbeRunning = false;
+  let autoScanBuffer = '';
+  let autoScanReadings = [];
+  let autoScanDetected = null;
+  let autoScanAttemptActive = false;
+  let autoScanRunning = false;
+  let autoDetectionEnabled = true;
+  let autoRetryAt = 0;
+  let lastPortsSignature = null;
 
   const desktop = window.desktopBridge && window.desktopBridge.isDesktop;
   function readJSON(key, fallback) {
@@ -286,6 +291,164 @@
     }
     return { frames, rest: '' };
   }
+  function addAutoScanReading(value, profile, mode) {
+    if (!Number.isFinite(value) || value < 0 || value > CAPACITY) return;
+    const previous = autoScanReadings[autoScanReadings.length - 1];
+    if (previous && (previous.profile !== profile || previous.mode !== mode)) autoScanReadings = [];
+    autoScanReadings.push({ value: Math.round(value * 100) / 100, profile, mode, time: Date.now() });
+    if (autoScanReadings.length > 5) autoScanReadings.shift();
+    if (autoScanReadings.length < 3) return;
+    const sample = autoScanReadings.slice(-3);
+    const values = sample.map(item => item.value);
+    const spread = Math.max(...values) - Math.min(...values);
+    const tolerance = Math.max(0.5, Math.max(...values) * 0.0005);
+    if (spread <= tolerance) {
+      autoScanDetected = { ...sample[sample.length - 1], readings: values };
+    }
+  }
+
+  function inspectAutoScanLine(line) {
+    const clean = String(line || '').replace(/[\\x00-\\x08\\x0B\\x0C\\x0E-\\x1F]/g, ' ').trim();
+    if (!clean) return;
+    const value = parseSerialWeight(clean);
+    if (value !== null) addAutoScanReading(value, 'generic', 'lines');
+  }
+
+  function consumeAutoScanData(data) {
+    autoScanBuffer += String(data || '');
+    const stx = String.fromCharCode(0x02);
+    const etx = String.fromCharCode(0x03);
+
+    while (true) {
+      const start = autoScanBuffer.indexOf(stx);
+      if (start < 0) break;
+      if (start > 0) {
+        const prefix = autoScanBuffer.slice(0, start);
+        prefix.split(/[\\r\\n]+/).forEach(inspectAutoScanLine);
+        autoScanBuffer = autoScanBuffer.slice(start);
+      }
+      const end = autoScanBuffer.indexOf(etx, 1);
+      if (end < 0) break;
+      const frame = autoScanBuffer.slice(0, end + 1);
+      const yaohuaValue = parseYaohuaA9Frame(frame);
+      if (yaohuaValue !== null) {
+        addAutoScanReading(yaohuaValue, 'yaohua-a9', 'yaohua-a9');
+      } else {
+        const inner = frame.slice(1, -1).replace(/[\\x00-\\x1F]/g, ' ').trim();
+        const value = parseSerialWeight(inner);
+        if (value !== null) addAutoScanReading(value, 'stx-etx', 'stx');
+      }
+      autoScanBuffer = autoScanBuffer.slice(end + 1);
+    }
+
+    const chunks = autoScanBuffer.split(/[\\r\\n]+/);
+    autoScanBuffer = chunks.pop() || '';
+    chunks.forEach(inspectAutoScanLine);
+
+    // Some indicators continuously stream a fixed-width ASCII frame without CR/LF.
+    if (autoScanBuffer.length >= 24) {
+      const value = parseSerialWeight(autoScanBuffer);
+      if (value !== null) addAutoScanReading(value, 'generic', 'continuous');
+      autoScanBuffer = autoScanBuffer.slice(-12);
+    }
+    if (autoScanBuffer.length > 512) autoScanBuffer = autoScanBuffer.slice(-128);
+  }
+
+  function applyDetectedSerialConfig(port, config, detected) {
+    $('serialDevice').value = port.path;
+    $('serialBaud').value = String(config.baudRate);
+    $('serialDataBits').value = String(config.dataBits);
+    $('serialStopBits').value = String(config.stopBits);
+    $('serialParity').value = config.parity;
+    $('serialFlow').value = 'none';
+    $('protocolProfile').value = detected.profile;
+    $('serialMode').value = detected.mode;
+    $('serialUnit').value = 'auto';
+    $('weightMode').value = 'auto';
+    activeWeightSource = 'serial';
+    rawScaleWeight = detected.value;
+    setWeight(detected.value);
+    setStability(true);
+    serialPort = { desktop: true, path: port.path, auto: true };
+    serialReading = true;
+    $('serialConnect').disabled = true;
+    $('serialDisconnect').disabled = false;
+    $('connectionSummary').textContent = 'متصل تلقائيًا';
+    $('sidebarDeviceStatus').textContent = 'تم التعرف على الميزان تلقائيًا';
+    $('deviceConnectionText').textContent = 'متصل تلقائيًا عبر ' + port.path;
+    $('deviceConnectionMark').textContent = '✓';
+    $('serialState').textContent = 'تم التعرف على الميزان تلقائيًا: ' + port.path + ' · ' + config.baudRate + ' baud · ' + config.dataBits + '-' + config.parity + '-' + config.stopBits;
+    renderAll();
+    showToast('تم التعرف على الميزان وتوصيله تلقائيًا');
+  }
+
+  async function autoDetectSerialPorts(ports) {
+    if (autoScanRunning || !autoDetectionEnabled || $('weightMode').value === 'manual' || serialPort) return;
+    autoScanRunning = true;
+    const commonBauds = [9600, 4800, 19200, 2400, 1200, 38400, 57600, 115200, 600, 300, 230400];
+    const configs = commonBauds.map(baudRate => ({ baudRate, dataBits: 8, stopBits: 1, parity: 'none', flowControl: 'none' }));
+    for (const baudRate of [9600, 4800, 2400, 19200]) {
+      configs.push(
+        { baudRate, dataBits: 7, stopBits: 1, parity: 'even', flowControl: 'none' },
+        { baudRate, dataBits: 7, stopBits: 1, parity: 'odd', flowControl: 'none' },
+        { baudRate, dataBits: 8, stopBits: 1, parity: 'even', flowControl: 'none' }
+      );
+    }
+    const usbSerialVendors = new Set(['1a86', '0403', '067b', '10c4', '1a87', '1b4f', '2e8a', '2341']);
+    const rankedPorts = ports.slice().sort((a, b) => {
+      const rank = item => usbSerialVendors.has(String(item.vendorId || '').toLowerCase()) ? 0 : item.vendorId ? 1 : 2;
+      return rank(a) - rank(b);
+    });
+    $('serialState').textContent = 'تم العثور على ' + rankedPorts.length + ' منفذ. البرنامج يفحص الكابل والبروتوكول وإعدادات الاتصال تلقائيًا...';
+    let lastError = '';
+    try {
+      for (const port of rankedPorts) {
+        for (let index = 0; index < configs.length; index++) {
+          if (!autoDetectionEnabled || $('weightMode').value === 'manual') return;
+          const config = configs[index];
+          autoScanAttemptActive = true;
+          autoScanBuffer = '';
+          autoScanReadings = [];
+          autoScanDetected = null;
+          $('serialState').textContent = 'فحص ' + port.path + ' · ' + config.baudRate + ' baud · إعداد ' + (index + 1) + ' من ' + configs.length;
+          try {
+            await window.desktopBridge.closeSerialPort();
+            await window.desktopBridge.openSerialPort({ path: port.path, ...config });
+            serialPort = { desktop: true, path: port.path, autoPending: true };
+            const deadline = Date.now() + 1450;
+            while (Date.now() < deadline && !autoScanDetected && autoDetectionEnabled) {
+              await new Promise(resolve => setTimeout(resolve, 75));
+            }
+            if (autoScanDetected) {
+              const detected = autoScanDetected;
+              autoScanAttemptActive = false;
+              applyDetectedSerialConfig(port, config, detected);
+              autoScanRunning = false;
+              autoRetryAt = Date.now() + 60000;
+              return;
+            }
+          } catch (error) {
+            lastError = error?.message || String(error);
+          }
+          try { await window.desktopBridge.closeSerialPort(); } catch (error) { lastError = error?.message || String(error); }
+          serialPort = null;
+        }
+      }
+      if (autoDetectionEnabled && $('weightMode').value !== 'manual') {
+        $('serialState').textContent = lastError
+          ? 'ظهرت منافذ COM لكن لم يتم تأكيد قراءة وزن صحيحة. آخر خطأ: ' + lastError
+          : 'تم فحص المنافذ والإعدادات الشائعة، ولم تصل قراءة وزن مؤكدة. اترك الميزان في وضع الإرسال المستمر أو راجع تعريف USB.';
+      }
+      serialPort = null;
+      serialReading = false;
+      activeWeightSource = 'waiting';
+      autoRetryAt = Date.now() + 20000;
+    } finally {
+      autoScanAttemptActive = false;
+      autoScanRunning = false;
+    }
+  }
+
   function applySerialValue(value) {
     if (value === null || !Number.isFinite(value)) return false;
     if (value < 0) {
@@ -327,6 +490,8 @@
   async function connectSerial() {
     if (desktop) {
       try {
+        if (autoScanRunning) { showToast('انتظر انتهاء البحث التلقائي أولًا.'); return; }
+        autoDetectionEnabled = false;
         const selectedPath = $('serialDevice').value;
         if (!selectedPath) { showToast('اختر منفذ COM أولاً'); return; }
         await window.desktopBridge.openSerialPort({
@@ -426,6 +591,7 @@
     }
   }
   async function disconnectSerial() {
+    autoDetectionEnabled = false;
     serialReading = false;
     if (desktop && serialPort?.desktop) {
       try { await window.desktopBridge.closeSerialPort(); } catch {}
@@ -509,6 +675,7 @@
     }
     $('weightMode').value = 'manual';
     activeWeightSource = 'manual';
+    rawScaleWeight = null;
     setWeight(value);
     setStability(true);
     $('formMessage').textContent = 'تم اعتماد الوزن يدويًا.';
@@ -517,6 +684,7 @@
   $('weightMode').addEventListener('change',()=>{
     if ($('weightMode').value === 'manual') {
       activeWeightSource = 'manual';
+      rawScaleWeight = null;
       $('formMessage').textContent = 'وضع الإدخال اليدوي مفعل. قراءة الكابل لن تغيّر الوزن الحالي.';
       $('manualWeight').value = liveWeight;
     } else {
@@ -604,85 +772,102 @@
       else if (['rice-continuous','rice-demand','mettler','avery','cas','generic'].includes(profile)) $('serialMode').value = 'lines';
     });
   if (desktop) {
-    const refreshPorts = async () => {
+    const refreshPorts = async (force = false) => {
       try {
         const ports = await window.desktopBridge.listSerialPorts();
         const select = $('serialDevice');
         const previous = select.value;
-        select.innerHTML = '<option value="">اختر منفذ الميزان</option>';
+        select.innerHTML = '<option value="">يتم اختيار المنفذ تلقائيًا</option>';
         ports.forEach(port => {
           const option = document.createElement('option');
           option.value = port.path;
-          option.textContent = port.path + (port.manufacturer ? ' — ' + port.manufacturer : '');
+          const identity = [port.manufacturer, port.vendorId && ('VID ' + port.vendorId), port.productId && ('PID ' + port.productId)].filter(Boolean).join(' · ');
+          option.textContent = port.path + (identity ? ' — ' + identity : '');
           select.appendChild(option);
         });
         if (ports.some(port => port.path === previous)) select.value = previous;
-        if (!ports.length) $('serialState').textContent = 'لم يتم العثور على منافذ COM. افحص الكابل والتعريف.';
-      } catch (error) { $('serialState').textContent = 'تعذر قراءة منافذ COM: ' + error.message; }
-    };
-    $('refreshSerialPorts').addEventListener('click', refreshPorts);
-    $('autoSerialSettings').addEventListener('click', async () => {
-      if (autoProbeRunning) return;
-      const path = $('serialDevice').value;
-      if (!path) { showToast('اختر منفذ الميزان أولاً'); return; }
-      autoProbeRunning = true;
-      $('autoSerialSettings').disabled = true;
-      $('serialState').textContent = 'يجرب إعدادات الاتصال الشائعة… اترك المؤشر يرسل بيانات الوزن.';
-      const candidates = [];
-      for (const baudRate of [9600, 4800, 19200, 2400, 1200, 38400, 57600, 115200, 300, 600, 230400]) {
-        for (const parity of ['none', 'even', 'odd']) candidates.push({ baudRate, dataBits: 8, stopBits: 1, parity, flowControl: 'none' });
-      }
-      try {
-        for (let i = 0; i < candidates.length; i++) {
-          const config = candidates[i];
-          $('serialState').textContent = 'اختبار ' + config.baudRate + ' baud / ' + config.parity + ' (' + (i + 1) + '/' + candidates.length + ')';
-          try {
-            await window.desktopBridge.closeSerialPort();
-            autoProbeValue = null;
-            autoProbeBuffer = '';
-            desktopSerialBuffer = '';
-            await window.desktopBridge.openSerialPort({ path, ...config });
-            serialPort = { desktop: true };
-            serialReading = true;
-            desktopSerialBuffer = '';
-            await new Promise(resolve => setTimeout(resolve, 1300));
-            if (autoProbeValue !== null) {
-              $('serialBaud').value = String(config.baudRate);
-              $('serialDataBits').value = String(config.dataBits);
-              $('serialStopBits').value = String(config.stopBits);
-              $('serialParity').value = config.parity;
-              $('serialFlow').value = 'none';
-              $('serialConnect').disabled = true;
-              $('serialDisconnect').disabled = false;
-              $('serialState').textContent = 'تم العثور على قراءة بالاعدادات: ' + config.baudRate + ' / 8-' + config.parity + '-1';
-              showToast('تم العثور على إعداد اتصال يستقبل الوزن');
-              return;
-            }
-          } catch {}
-        }
-        await window.desktopBridge.closeSerialPort();
-        serialPort = null;
-        $('serialState').textContent = 'لم يتم اكتشاف قراءة. جرّب إعدادًا يدويًا أو تحقق من إرسال المؤشر للبيانات.';
-        showToast('لم تنجح التجربة التلقائية');
-      } finally {
-        autoProbeRunning = false;
-        $('autoSerialSettings').disabled = false;
-      }
-    });
-    $('usbHelp').addEventListener('click', () => { refreshPorts(); showToast('محولات USB-to-Serial تظهر هنا كمنفذ COM.'); });
+        const signature = ports.map(port => [port.path, port.vendorId || '', port.productId || ''].join(':')).sort().join('|');
+        const changed = force || signature !== lastPortsSignature;
+        lastPortsSignature = signature;
 
-    refreshPorts();
-    window.desktopBridge.onSerialData(data => consumeDesktopSerialData(data));
-    window.desktopBridge.onSerialError(error => { $('serialState').textContent = 'خطأ في منفذ COM: ' + error; });
-    window.desktopBridge.onSerialClosed(() => {
-      serialPort = null; serialReading = false;
-      $('serialConnect').disabled = false; $('serialDisconnect').disabled = true;
-      $('serialState').textContent = 'تم إغلاق منفذ COM';
+        if (serialPort?.path && !ports.some(port => port.path === serialPort.path) && !autoScanAttemptActive) {
+          serialPort = null;
+          serialReading = false;
+          activeWeightSource = 'waiting';
+          $('serialConnect').disabled = false;
+          $('serialDisconnect').disabled = true;
+          $('connectionSummary').textContent = 'غير متصل';
+          $('sidebarDeviceStatus').textContent = 'تم فصل كابل الميزان';
+          $('deviceConnectionText').textContent = 'تم فصل الكابل — جاري إعادة البحث تلقائيًا';
+          $('deviceConnectionMark').textContent = '—';
+          $('serialState').textContent = 'تم اكتشاف فصل الكابل. البرنامج سيبحث تلقائيًا عند إعادة توصيله.';
+          renderAll();
+        }
+
+        if (!ports.length) {
+          if (!serialPort && !autoScanRunning) $('serialState').textContent = 'بانتظار توصيل كابل الميزان USB أو محول USB-to-RS232...';
+          return;
+        }
+        if (!serialPort && autoDetectionEnabled && $('weightMode').value !== 'manual' && !autoScanRunning &&
+            (changed || Date.now() >= autoRetryAt)) {
+          autoRetryAt = Date.now() + 20000;
+          autoDetectSerialPorts(ports);
+        }
+      } catch (error) {
+        $('serialState').textContent = 'تعذر فحص منافذ USB/COM: ' + error.message;
+      }
+    };
+
+    $('refreshSerialPorts').addEventListener('click', () => refreshPorts(true));
+    $('autoSerialSettings').addEventListener('click', async () => {
+      autoDetectionEnabled = true;
+      autoRetryAt = 0;
+      if (serialPort?.desktop && !serialPort.autoPending) {
+        try { await window.desktopBridge.closeSerialPort(); } catch {}
+        serialPort = null;
+      }
+      await refreshPorts(true);
+      if (!autoScanRunning && !serialPort) {
+        const ports = await window.desktopBridge.listSerialPorts();
+        if (ports.length) autoDetectSerialPorts(ports);
+        else $('serialState').textContent = 'لم يظهر منفذ USB/COM. افحص الكابل وتعريف المحول.';
+      }
     });
+    $('usbHelp').addEventListener('click', async () => {
+      await refreshPorts(true);
+      showToast('وصل الكابل فقط؛ البرنامج يبحث عن منفذ USB/COM تلقائيًا.');
+    });
+
+    window.desktopBridge.onSerialData(data => {
+      if (autoScanAttemptActive) consumeAutoScanData(data);
+      else consumeDesktopSerialData(data);
+    });
+    window.desktopBridge.onSerialError(error => {
+      if (!autoScanAttemptActive) $('serialState').textContent = 'خطأ في منفذ COM: ' + error;
+    });
+    window.desktopBridge.onSerialClosed(() => {
+      if (autoScanAttemptActive) return;
+      serialPort = null;
+      serialReading = false;
+      $('serialConnect').disabled = false;
+      $('serialDisconnect').disabled = true;
+      $('connectionSummary').textContent = 'غير متصل';
+      $('sidebarDeviceStatus').textContent = 'بانتظار توصيل الميزان';
+      $('deviceConnectionText').textContent = 'غير متصل — سيبدأ البحث عند ظهور منفذ USB/COM';
+      $('deviceConnectionMark').textContent = '—';
+      $('serialState').textContent = autoDetectionEnabled
+        ? 'انقطع اتصال الميزان؛ جاري إعادة الاكتشاف تلقائيًا.'
+        : 'تم إغلاق الاتصال اليدوي.';
+    });
+
+    refreshPorts(true);
+    setInterval(() => refreshPorts(false), 2000);
   } else {
     $('serialDevice').disabled = true;
     $('refreshSerialPorts').disabled = true;
-    $('serialDevice').innerHTML = '<option>اختر المنفذ من نافذة اتصال المتصفح</option>';
+    $('autoSerialSettings').disabled = true;
+    $('serialDevice').innerHTML = '<option>اكتشاف تلقائي للأجهزة متاح في نسخة Windows</option>';
+    $('serialState').textContent = 'لأسباب أمان المتصفح، اكتشاف الكابل تلقائيًا متاح في نسخة Windows فقط. استخدم اختيار المنفذ من المتصفح عند الحاجة.';
   }
 
   if (desktop) {
