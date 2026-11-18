@@ -301,7 +301,7 @@
     const sample = autoScanReadings.slice(-3);
     const values = sample.map(item => item.value);
     const spread = Math.max(...values) - Math.min(...values);
-    const tolerance = Math.max(0.5, Math.max(...values) * 0.0005);
+    const tolerance = Math.max(0.5, Math.max(...values) * 0.0001);
     if (spread <= tolerance) {
       autoScanDetected = { ...sample[sample.length - 1], readings: values };
     }
@@ -315,9 +315,14 @@
   }
 
   function consumeAutoScanData(data) {
-    autoScanBuffer += String(data || '');
+    const incoming = String(data || '');
     const stx = String.fromCharCode(0x02);
     const etx = String.fromCharCode(0x03);
+    if (!autoScanBuffer.includes(stx) && !incoming.includes(stx) && !incoming.includes(etx) && !/[\\r\\n]/.test(incoming)) {
+      const chunkValue = parseSerialWeight(incoming);
+      if (chunkValue !== null) addAutoScanReading(chunkValue, 'generic', 'continuous');
+    }
+    autoScanBuffer += incoming;
 
     while (true) {
       const start = autoScanBuffer.indexOf(stx);
@@ -345,12 +350,6 @@
     autoScanBuffer = chunks.pop() || '';
     chunks.forEach(inspectAutoScanLine);
 
-    // Some indicators continuously stream a fixed-width ASCII frame without CR/LF.
-    if (autoScanBuffer.length >= 24) {
-      const value = parseSerialWeight(autoScanBuffer);
-      if (value !== null) addAutoScanReading(value, 'generic', 'continuous');
-      autoScanBuffer = autoScanBuffer.slice(-12);
-    }
     if (autoScanBuffer.length > 512) autoScanBuffer = autoScanBuffer.slice(-128);
   }
 
@@ -416,7 +415,8 @@
             await window.desktopBridge.closeSerialPort();
             await window.desktopBridge.openSerialPort({ path: port.path, ...config });
             serialPort = { desktop: true, path: port.path, autoPending: true };
-            const deadline = Date.now() + 1450;
+            const waitMs = index < 5 ? 2400 : 1600;
+            const deadline = Date.now() + waitMs;
             while (Date.now() < deadline && !autoScanDetected && autoDetectionEnabled) {
               await new Promise(resolve => setTimeout(resolve, 75));
             }
