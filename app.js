@@ -465,7 +465,7 @@
     return true;
   }
   function consumeDesktopSerialData(data) {
-    if ($('serialMode').value === 'continuous' && !/[\\r\\n\\x02\\x03]/.test(String(data || ''))) {
+    if ($('serialMode').value === 'continuous' && !/[\r\n\x02\x03]/.test(String(data || ''))) {
       const directValue = parseSerialWeight(data);
       if (directValue !== null) applySerialValue(directValue);
       return;
@@ -476,16 +476,9 @@
       desktopSerialBuffer = extracted.rest;
       for (const frame of extracted.frames) {
         const value = parseYaohuaA9Frame(frame);
-        if (value !== null) {
-          if (autoProbeRunning) autoProbeValue = value;
-          applySerialValue(value);
-        }
+        if (value !== null) applySerialValue(value);
       }
       return;
-    }
-    if (autoProbeRunning) {
-      const probeValue = parseSerialWeight(data);
-      if (probeValue !== null) autoProbeValue = probeValue;
     }
     desktopSerialBuffer += data;
     const split = splitSerialFrames(desktopSerialBuffer, $('serialMode').value);
