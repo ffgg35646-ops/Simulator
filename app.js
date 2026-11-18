@@ -178,15 +178,11 @@
     showToast('تم حذف جميع السجلات وتحديث ملف Excel');
   }
   function updateConnectionCard() {
-    const card = $('connectionStatCard');
-    const grid = $('dashboardStatsGrid');
     const isConnected = Boolean(serialPort && !serialPort.autoPending);
-    if (card) card.hidden = !isConnected;
-    if (grid) grid.classList.toggle('has-connected-scale', isConnected);
-    if (!isConnected) return;
-    $('connectionSummary').textContent = serialPort.auto ? 'متصل تلقائيًا' : 'متصل';
-    const details = $('connectionSummaryDetails');
-    if (details) details.textContent = serialPort.path ? 'المنفذ ' + serialPort.path : 'تم فتح اتصال الميزان';
+    const status = $('connectionSummary');
+    const dot = $('connectionStatusDot');
+    if (status) status.textContent = isConnected ? 'متصل' : 'غير متصل';
+    if (dot) dot.className = 'connection-dot ' + (isConnected ? 'is-connected' : 'is-disconnected');
   }
   function renderAll() {
     const today = dateKey(now());
@@ -826,6 +822,7 @@
       if (serialPort?.desktop && !serialPort.autoPending) {
         try { await window.desktopBridge.closeSerialPort(); } catch {}
         serialPort = null;
+        renderAll();
       }
       await refreshPorts(true);
       if (!autoScanRunning && !serialPort) {
