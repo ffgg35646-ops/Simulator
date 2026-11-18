@@ -435,6 +435,22 @@
   $('exportExcel').addEventListener('click',exportExcel);
   $('serialConnect').addEventListener('click',connectSerial);
   $('serialDisconnect').addEventListener('click',disconnectSerial);
+
+    $('protocolProfile').addEventListener('change', () => {
+      const profile = $('protocolProfile').value;
+      if (profile === 'yaohua-a9') {
+        $('serialMode').value = 'yaohua-a9';
+        $('serialBaud').value = '9600';
+        $('serialDataBits').value = '8';
+        $('serialParity').value = 'none';
+        $('serialStopBits').value = '1';
+        $('serialFlow').value = 'none';
+        $('serialUnit').value = 'kg';
+        $('serialState').textContent = 'ملف YAOHUA جاهز. تأكد أن المؤشر مضبوط على tF=0 (إرسال مستمر) ونفس سرعة Baud.';
+      } else if (profile === 'stx-etx') $('serialMode').value = 'stx';
+      else if (profile === 'raw-stream') $('serialMode').value = 'continuous';
+      else if (['rice-continuous','rice-demand','mettler','avery','cas','generic'].includes(profile)) $('serialMode').value = 'lines';
+    });
   if (desktop) {
     const refreshPorts = async () => {
       try {
@@ -502,21 +518,7 @@
       }
     });
     $('usbHelp').addEventListener('click', () => { refreshPorts(); showToast('محولات USB-to-Serial تظهر هنا كمنفذ COM.'); });
-    $('protocolProfile').addEventListener('change', () => {
-      const profile = $('protocolProfile').value;
-      if (profile === 'yaohua-a9') {
-        $('serialMode').value = 'yaohua-a9';
-        $('serialBaud').value = '9600';
-        $('serialDataBits').value = '8';
-        $('serialParity').value = 'none';
-        $('serialStopBits').value = '1';
-        $('serialFlow').value = 'none';
-        $('serialUnit').value = 'kg';
-        $('serialState').textContent = 'ملف YAOHUA جاهز. تأكد أن المؤشر مضبوط على tF=0 (إرسال مستمر) ونفس سرعة Baud.';
-      } else if (profile === 'stx-etx') $('serialMode').value = 'stx';
-      else if (profile === 'raw-stream') $('serialMode').value = 'continuous';
-      else if (['rice-continuous','rice-demand','mettler','avery','cas','generic'].includes(profile)) $('serialMode').value = 'lines';
-    });
+
     refreshPorts();
     window.desktopBridge.onSerialData(data => consumeDesktopSerialData(data));
     window.desktopBridge.onSerialError(error => { $('serialState').textContent = 'خطأ في منفذ COM: ' + error; });
