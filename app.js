@@ -308,7 +308,7 @@
   }
 
   function inspectAutoScanLine(line) {
-    const clean = String(line || '').replace(/[\\x00-\\x08\\x0B\\x0C\\x0E-\\x1F]/g, ' ').trim();
+    const clean = String(line || '').replace(/[\x00-\x08\x0B\x0C\x0E-\x1F]/g, ' ').trim();
     if (!clean) return;
     const value = parseSerialWeight(clean);
     if (value !== null) addAutoScanReading(value, 'generic', 'lines');
@@ -324,7 +324,7 @@
       if (start < 0) break;
       if (start > 0) {
         const prefix = autoScanBuffer.slice(0, start);
-        prefix.split(/[\\r\\n]+/).forEach(inspectAutoScanLine);
+        prefix.split(/[\r\n]+/).forEach(inspectAutoScanLine);
         autoScanBuffer = autoScanBuffer.slice(start);
       }
       const end = autoScanBuffer.indexOf(etx, 1);
@@ -334,7 +334,7 @@
       if (yaohuaValue !== null) {
         addAutoScanReading(yaohuaValue, 'yaohua-a9', 'yaohua-a9');
       } else {
-        const inner = frame.slice(1, -1).replace(/[\\x00-\\x1F]/g, ' ').trim();
+        const inner = frame.slice(1, -1).replace(/[\x00-\x1F]/g, ' ').trim();
         const value = parseSerialWeight(inner);
         if (value !== null) addAutoScanReading(value, 'stx-etx', 'stx');
       }
@@ -399,6 +399,7 @@
       const rank = item => usbSerialVendors.has(String(item.vendorId || '').toLowerCase()) ? 0 : item.vendorId ? 1 : 2;
       return rank(a) - rank(b);
     });
+    $('serialUnit').value = 'auto';
     $('serialState').textContent = 'تم العثور على ' + rankedPorts.length + ' منفذ. البرنامج يفحص الكابل والبروتوكول وإعدادات الاتصال تلقائيًا...';
     let lastError = '';
     try {
