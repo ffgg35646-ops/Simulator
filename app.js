@@ -539,6 +539,8 @@
     refreshExcelSyncStatus();
   } else {
     setExcelSyncStatus(null);
+    $('chooseExcelFile').disabled = true;
+    $('openExcelFile').disabled = true;
   }
   $('serialConnect').addEventListener('click',connectSerial);
   $('serialDisconnect').addEventListener('click',disconnectSerial);
