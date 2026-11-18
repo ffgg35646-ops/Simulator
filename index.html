@@ -38,11 +38,11 @@
 
       <section class="view active" id="view-dashboard">
         <div class="welcome-row"><div><h2>مرحبًا بك في مركز التحكم</h2><p>تابع حركة الوزن وسجّل عمليات الشاحنات من مكان واحد.</p></div><div class="date-chip" id="todayDate"></div></div>
-        <div class="stats-grid dashboard-stats">
+        <div class="stats-grid dashboard-stats" id="dashboardStatsGrid">
           <article class="stat-card"><div class="stat-icon teal">▤</div><div><span>عمليات اليوم</span><strong id="todayCount">0</strong><small>إجمالي التذاكر المسجلة</small></div></article>
           <article class="stat-card"><div class="stat-icon blue">▰</div><div><span>إجمالي صافي الوزن اليوم</span><strong id="todayNet">0 <em>كجم</em></strong><small>مجموع الحمولات الصافية</small></div></article>
           <article class="stat-card"><div class="stat-icon amber">◷</div><div><span>آخر عملية وزن</span><strong id="lastWeighing">—</strong><small>آخر تذكرة محفوظة</small></div></article>
-          
+          <article class="stat-card connection-stat" id="connectionStatCard" hidden><div class="stat-icon purple">⌁</div><div><span>حالة اتصال الميزان</span><strong class="status-text" id="connectionSummary">متصل</strong><small id="connectionSummaryDetails">تم التعرف على الميزان</small></div></article>
         </div>
 
         <div class="work-grid">
