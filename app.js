@@ -184,10 +184,7 @@
     $('todayCount').textContent = fmt(todays.length);
     $('todayNet').innerHTML = fmt(todayNet) + ' <em>كجم</em>';
     $('lastWeighing').textContent = records.length ? stamp(new Date(records[0].createdAt)) : '—';
-    $('connectionSummary').textContent = serialPort ? (serialPort.auto ? 'متصل تلقائيًا' : 'متصل Serial') : 'غير متصل';
     $('sidebarDeviceStatus').textContent = serialPort ? (serialPort.auto ? 'تم التعرف على الميزان تلقائيًا' : 'الميزان متصل') : 'بانتظار توصيل الميزان';
-    $('deviceConnectionText').textContent = serialPort ? (serialPort.auto ? 'متصل تلقائيًا عبر ' + (serialPort.path || 'USB/COM') : 'متصل ويستقبل بيانات الوزن') : 'غير متصل — يمكنك استخدام الإدخال اليدوي';
-    $('deviceConnectionMark').textContent = serialPort ? '✓' : '—';
     $('recentTable').innerHTML = records.length ? records.slice(0,5).map(r=>rowMarkup(r)).join('') : '<tr class="empty-row"><td colspan="7">لا توجد عمليات مسجلة حتى الآن</td></tr>';
     renderRecords();
     renderVehicles();
@@ -372,10 +369,7 @@
     serialReading = true;
     $('serialConnect').disabled = true;
     $('serialDisconnect').disabled = false;
-    $('connectionSummary').textContent = 'متصل تلقائيًا';
     $('sidebarDeviceStatus').textContent = 'تم التعرف على الميزان تلقائيًا';
-    $('deviceConnectionText').textContent = 'متصل تلقائيًا عبر ' + port.path;
-    $('deviceConnectionMark').textContent = '✓';
     $('serialState').textContent = 'تم التعرف على الميزان تلقائيًا: ' + port.path + ' · ' + config.baudRate + ' baud · ' + config.dataBits + '-' + config.parity + '-' + config.stopBits;
     renderAll();
     showToast('تم التعرف على الميزان وتوصيله تلقائيًا');
@@ -507,7 +501,6 @@
         $('serialState').textContent = 'متصل بالمنفذ ' + selectedPath + ' — في انتظار بيانات الميزان';
         $('serialConnect').disabled = true;
         $('serialDisconnect').disabled = false;
-        $('connectionSummary').textContent = 'متصل Serial';
         showToast('تم فتح منفذ الميزان');
       } catch (error) {
         serialPort = null;
@@ -528,7 +521,6 @@
       $('serialState').textContent = 'متصل — في انتظار بيانات الميزان';
       $('serialConnect').disabled = true;
       $('serialDisconnect').disabled = false;
-      $('connectionSummary').textContent = 'متصل Serial';
       showToast('تم الاتصال بالمنفذ. في انتظار بيانات الميزان.');
       readSerial();
     } catch (error) {
@@ -598,10 +590,7 @@
       $('serialConnect').disabled = false;
       $('serialDisconnect').disabled = true;
       $('serialState').textContent = 'غير متصل — يمكنك إدخال الوزن يدويًا';
-      $('connectionSummary').textContent = 'غير متصل';
       $('sidebarDeviceStatus').textContent = 'بانتظار توصيل الميزان';
-      $('deviceConnectionText').textContent = 'غير متصل — يمكنك استخدام الإدخال اليدوي';
-      $('deviceConnectionMark').textContent = '—';
       showToast('تم قطع الاتصال بالميزان');
       return;
     }
@@ -612,10 +601,7 @@
     $('serialConnect').disabled = false;
     $('serialDisconnect').disabled = true;
     $('serialState').textContent = 'غير متصل — يمكنك إدخال الوزن يدويًا';
-    $('connectionSummary').textContent = 'غير متصل';
     $('sidebarDeviceStatus').textContent = 'بانتظار توصيل الميزان';
-    $('deviceConnectionText').textContent = 'غير متصل — يمكنك استخدام الإدخال اليدوي';
-    $('deviceConnectionMark').textContent = '—';
     showToast('تم قطع الاتصال بالميزان');
   }
   async function exportExcel() {
@@ -796,10 +782,7 @@
           activeWeightSource = 'waiting';
           $('serialConnect').disabled = false;
           $('serialDisconnect').disabled = true;
-          $('connectionSummary').textContent = 'غير متصل';
           $('sidebarDeviceStatus').textContent = 'تم فصل كابل الميزان';
-          $('deviceConnectionText').textContent = 'تم فصل الكابل — جاري إعادة البحث تلقائيًا';
-          $('deviceConnectionMark').textContent = '—';
           $('serialState').textContent = 'تم اكتشاف فصل الكابل. البرنامج سيبحث تلقائيًا عند إعادة توصيله.';
           renderAll();
         }
@@ -853,10 +836,7 @@
       if (autoDetectionEnabled) autoRetryAt = 0;
       $('serialConnect').disabled = false;
       $('serialDisconnect').disabled = true;
-      $('connectionSummary').textContent = 'غير متصل';
       $('sidebarDeviceStatus').textContent = 'بانتظار توصيل الميزان';
-      $('deviceConnectionText').textContent = 'غير متصل — سيبدأ البحث عند ظهور منفذ USB/COM';
-      $('deviceConnectionMark').textContent = '—';
       $('serialState').textContent = autoDetectionEnabled
         ? 'انقطع اتصال الميزان؛ جاري إعادة الاكتشاف تلقائيًا.'
         : 'تم إغلاق الاتصال اليدوي.';
@@ -911,7 +891,6 @@
 
   if (!desktop && !('serial' in navigator)) $('serialState').textContent = 'استخدم Chrome أو Edge على كمبيوتر لعرض منافذ Serial.';
   if (navigator.serial) navigator.serial.addEventListener('disconnect', () => { if (serialPort) disconnectSerial(); });
-  $('exportQuick').addEventListener('click',exportCSV);
   $('printReport').addEventListener('click',()=>window.print());
   $('closeTicket').addEventListener('click',()=>$('ticketModal').classList.remove('open'));
   $('closeTicket2').addEventListener('click',()=>$('ticketModal').classList.remove('open'));
