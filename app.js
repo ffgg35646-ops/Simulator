@@ -177,6 +177,17 @@
     resetTicket();
     showToast('تم حذف جميع السجلات وتحديث ملف Excel');
   }
+  function updateConnectionCard() {
+    const card = $('connectionStatCard');
+    const grid = $('dashboardStatsGrid');
+    const isConnected = Boolean(serialPort && !serialPort.autoPending);
+    if (card) card.hidden = !isConnected;
+    if (grid) grid.classList.toggle('has-connected-scale', isConnected);
+    if (!isConnected) return;
+    $('connectionSummary').textContent = serialPort.auto ? 'متصل تلقائيًا' : 'متصل';
+    const details = $('connectionSummaryDetails');
+    if (details) details.textContent = serialPort.path ? 'المنفذ ' + serialPort.path : 'تم فتح اتصال الميزان';
+  }
   function renderAll() {
     const today = dateKey(now());
     const todays = records.filter(r => dateKey(new Date(r.createdAt)) === today);
@@ -184,6 +195,7 @@
     $('todayCount').textContent = fmt(todays.length);
     $('todayNet').innerHTML = fmt(todayNet) + ' <em>كجم</em>';
     $('lastWeighing').textContent = records.length ? stamp(new Date(records[0].createdAt)) : '—';
+    updateConnectionCard();
     $('sidebarDeviceStatus').textContent = serialPort ? (serialPort.auto ? 'تم التعرف على الميزان تلقائيًا' : 'الميزان متصل') : 'بانتظار توصيل الميزان';
     $('recentTable').innerHTML = records.length ? records.slice(0,5).map(r=>rowMarkup(r)).join('') : '<tr class="empty-row"><td colspan="7">لا توجد عمليات مسجلة حتى الآن</td></tr>';
     renderRecords();
@@ -495,15 +507,17 @@
           parity: $('serialParity').value,
           flowControl: $('serialFlow').value
         });
-        serialPort = { desktop: true };
+        serialPort = { desktop: true, path: selectedPath };
         serialReading = true;
         desktopSerialBuffer = '';
         $('serialState').textContent = 'متصل بالمنفذ ' + selectedPath + ' — في انتظار بيانات الميزان';
         $('serialConnect').disabled = true;
         $('serialDisconnect').disabled = false;
+        renderAll();
         showToast('تم فتح منفذ الميزان');
       } catch (error) {
         serialPort = null;
+        renderAll();
         $('serialState').textContent = 'تعذر الاتصال: ' + error.message;
         showToast('لم يتم الاتصال بالميزان');
       }
@@ -521,10 +535,12 @@
       $('serialState').textContent = 'متصل — في انتظار بيانات الميزان';
       $('serialConnect').disabled = true;
       $('serialDisconnect').disabled = false;
+      renderAll();
       showToast('تم الاتصال بالمنفذ. في انتظار بيانات الميزان.');
       readSerial();
     } catch (error) {
       serialPort = null;
+      renderAll();
       $('serialState').textContent = 'تعذر الاتصال: ' + (error.message || 'لم يتم اختيار منفذ');
       showToast('لم يتم الاتصال بالميزان');
     }
@@ -591,6 +607,7 @@
       $('serialDisconnect').disabled = true;
       $('serialState').textContent = 'غير متصل — يمكنك إدخال الوزن يدويًا';
       $('sidebarDeviceStatus').textContent = 'بانتظار توصيل الميزان';
+      renderAll();
       showToast('تم قطع الاتصال بالميزان');
       return;
     }
@@ -602,6 +619,7 @@
     $('serialDisconnect').disabled = true;
     $('serialState').textContent = 'غير متصل — يمكنك إدخال الوزن يدويًا';
     $('sidebarDeviceStatus').textContent = 'بانتظار توصيل الميزان';
+    renderAll();
     showToast('تم قطع الاتصال بالميزان');
   }
   async function exportExcel() {
@@ -840,6 +858,7 @@
       $('serialState').textContent = autoDetectionEnabled
         ? 'انقطع اتصال الميزان؛ جاري إعادة الاكتشاف تلقائيًا.'
         : 'تم إغلاق الاتصال اليدوي.';
+      renderAll();
     });
 
     refreshPorts(true);
