@@ -38,16 +38,16 @@
 
       <section class="view active" id="view-dashboard">
         <div class="welcome-row"><div><h2>مرحبًا بك في مركز التحكم</h2><p>تابع حركة الوزن وسجّل عمليات الشاحنات من مكان واحد.</p></div><div class="date-chip" id="todayDate"></div></div>
-        <div class="stats-grid">
+        <div class="stats-grid dashboard-stats">
           <article class="stat-card"><div class="stat-icon teal">▤</div><div><span>عمليات اليوم</span><strong id="todayCount">0</strong><small>إجمالي التذاكر المسجلة</small></div></article>
           <article class="stat-card"><div class="stat-icon blue">▰</div><div><span>إجمالي صافي الوزن اليوم</span><strong id="todayNet">0 <em>كجم</em></strong><small>مجموع الحمولات الصافية</small></div></article>
           <article class="stat-card"><div class="stat-icon amber">◷</div><div><span>آخر عملية وزن</span><strong id="lastWeighing">—</strong><small>آخر تذكرة محفوظة</small></div></article>
-          <article class="stat-card"><div class="stat-icon purple">⌁</div><div><span>حالة الاتصال</span><strong class="status-text" id="connectionSummary">غير متصل</strong><small>مصدر قراءة الوزن الحالي</small></div></article>
+          
         </div>
 
         <div class="work-grid">
           <section class="panel scale-panel">
-            <div class="panel-heading"><div><span class="eyebrow">LIVE SCALE</span><h3>قراءة الوزن المباشر</h3></div><span class="live-badge"><i></i> مباشر تجريبي</span></div>
+            <div class="panel-heading"><div><span class="eyebrow">LIVE SCALE</span><h3>قراءة الوزن المباشر</h3></div></div>
             <div class="weight-display">
               <div class="weight-caption">الوزن الحالي · <span id="weightSourceLabel">إدخال يدوي</span></div>
               <div class="weight-value" id="liveWeight">0<span>كجم</span></div>
@@ -79,10 +79,7 @@
             </div>
           </section>
 
-          <aside class="right-column">
-            <section class="panel connection-panel"><div class="panel-heading"><div><span class="eyebrow">DEVICE LINK</span><h3>حالة اتصال الميزان</h3></div><span class="mini-status">اتصال فعلي</span></div><div class="connection-option"><span class="connection-symbol">⇄</span><div><strong>RS232 / USB Serial</strong><small id="deviceConnectionText">غير متصل — يمكنك استخدام الإدخال اليدوي</small></div><span class="lock-mark" id="deviceConnectionMark">—</span></div><div class="connection-option"><span class="connection-symbol">⌘</span><div><strong>Ethernet TCP/IP</strong><small>اتصال شبكي مباشر عند توفر إعدادات الجهاز</small></div><span class="lock-mark">—</span></div><button class="btn btn-outline btn-block" data-go="connections">إعدادات الاتصال</button></section>
-            <section class="panel quick-panel"><div class="panel-heading"><div><span class="eyebrow">QUICK ACCESS</span><h3>اختصارات سريعة</h3></div></div><button class="quick-link" data-go="weighings"><span>▤</span> عرض سجل الوزن <b>←</b></button><button class="quick-link" data-go="reports"><span>▥</span> التقارير والإحصائيات <b>←</b></button><button class="quick-link" id="exportQuick"><span>⇩</span> تصدير سجل العمليات <b>←</b></button></section>
-          </aside>
+          
         </div>
         <section class="panel recent-panel"><div class="panel-heading"><div><span class="eyebrow">LATEST ACTIVITY</span><h3>أحدث عمليات الوزن</h3></div><button class="text-button" data-go="weighings">عرض الكل ←</button></div><div class="table-wrap"><table><thead><tr><th>رقم التذكرة</th><th>السيارة</th><th>العميل</th><th>الوزن الأول</th><th>الوزن الثاني</th><th>الصافي</th><th>التاريخ</th></tr></thead><tbody id="recentTable"><tr class="empty-row"><td colspan="7">لا توجد عمليات مسجلة حتى الآن</td></tr></tbody></table></div></section>
       </section>
