@@ -915,8 +915,9 @@
       return;
     }
     try {
+      deviceExplorerCurrentConfig = { path: 'Web Serial', baudRate: Number($('serialBaud').value), dataBits: Number($('serialDataBits').value), stopBits: Number($('serialStopBits').value), parity: $('serialParity').value, flowControl: $('serialFlow').value };
       serialPort = await navigator.serial.requestPort();
-      await serialPort.open({ baudRate: Number($('serialBaud').value), dataBits: Number($('serialDataBits').value), stopBits: Number($('serialStopBits').value), parity: $('serialParity').value, flowControl: $('serialFlow').value });
+      await serialPort.open({ baudRate: deviceExplorerCurrentConfig.baudRate, dataBits: deviceExplorerCurrentConfig.dataBits, stopBits: deviceExplorerCurrentConfig.stopBits, parity: deviceExplorerCurrentConfig.parity, flowControl: deviceExplorerCurrentConfig.flowControl });
       serialReading = true;
       $('serialState').textContent = 'متصل — في انتظار بيانات الميزان';
       $('serialConnect').disabled = true;
@@ -963,7 +964,9 @@
         while (serialReading) {
           const result = await serialReader.read();
           if (result.done) break;
-          buffer += new TextDecoder().decode(result.value);
+          const incoming = new TextDecoder().decode(result.value);
+          recordDeviceExplorerData(incoming);
+          buffer += incoming;
           if ($('protocolProfile').value === 'yaohua-a9') {
             const extracted = extractYaohuaA9Frames(buffer);
             buffer = extracted.rest;
