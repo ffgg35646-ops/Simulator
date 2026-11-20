@@ -211,7 +211,9 @@
   };
   function explorerHexId(value) {
     if (value === undefined || value === null || value === '') return '—';
-    const clean = String(value).replace(/^0x/i, '').toLowerCase();
+    const clean = typeof value === 'number' && Number.isFinite(value)
+      ? Math.trunc(value).toString(16)
+      : String(value).replace(/^0x/i, '').toLowerCase();
     return clean ? clean.padStart(4, '0') : '—';
   }
   function explorerPortVendor(port) {
