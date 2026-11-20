@@ -191,17 +191,26 @@ ipcMain.handle('excel:open-file', async () => {
   if (openError) throw new Error(openError);
   return { path: status.path };
 });
-ipcMain.handle('excel:export', async (_event, rendererRecords) => {
+ipcMain.handle('excel:export', async (_event, rendererRecords, options = {}) => {
+  const requestedName = String(options?.fileName || '').trim()
+    .replace(/[<>:"/\\|?*\x00-\x1F]/g, '-')
+    .replace(/\.xlsx$/i, '');
+  const defaultName = requestedName || 'Weighbridge-120T-Export-' + new Date().toISOString().slice(0,10);
   const result = await dialog.showSaveDialog(mainWindow, {
-    title: 'تصدير نسخة Excel',
+    title: 'تصدير ملف Excel',
     buttonLabel: 'حفظ ملف Excel',
-    defaultPath: path.join(app.getPath('documents'), `Weighbridge-120T-Export-${new Date().toISOString().slice(0,10)}.xlsx`),
+    defaultPath: path.join(app.getPath('documents'), defaultName + '.xlsx'),
     filters: [{ name: 'Excel Workbook', extensions: ['xlsx'] }]
   });
   if (result.canceled || !result.filePath) return { canceled: true };
   const targetPath = result.filePath.toLowerCase().endsWith('.xlsx') ? result.filePath : result.filePath + '.xlsx';
   const rows = Array.isArray(rendererRecords) ? rendererRecords : getStoredRecords();
-  return { canceled: false, ok: true, path: writeExcelFile(rows, targetPath), count: rows.length };
+  const savedPath = writeExcelFile(rows, targetPath);
+  if (options?.openAfterExport) {
+    const openError = await shell.openPath(savedPath);
+    if (openError) throw new Error(openError);
+  }
+  return { canceled: false, ok: true, path: savedPath, count: rows.length };
 });
 
 ipcMain.handle('serial:list', async () => SerialPort.list());
