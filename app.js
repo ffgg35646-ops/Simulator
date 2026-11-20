@@ -179,10 +179,10 @@
   }
   function ticketMarkup(r) {
     return '<div class="ticket-paper"><div class="ticket-brand"><h2>WEIGHBRIDGE 120T</h2><p>تذكرة وزن شاحنة · Truck Weighing Ticket</p></div><div class="ticket-number">رقم التذكرة: ' + esc(r.id) + '</div><div class="ticket-grid">' +
-      ticketField('نوع الحركة',r.movementType || '—') + ticketField('اسم العميل',r.customer) +
-      ticketField('اسم السائق',r.driver) + ticketField('اسم الشحنة',r.shipment || '—') +
-      ticketField('المحافظة',r.governorate || '—') + ticketField('رقم السيارة',r.plate) +
-      ticketField('رقم المقطورة',r.trailer || '—') + ticketField('تاريخ العملية',stamp(new Date(r.createdAt))) +
+      ticketField('اسم العميل',r.customer) + ticketField('اسم السائق',r.driver) +
+      ticketField('رقم السيارة',r.plate) + ticketField('رقم المقطورة',r.trailer || '—') +
+      ticketField('المحافظة',r.governorate || '—') + ticketField('نوع الحركة',r.movementType || '—') +
+      ticketField('اسم الشحنة',r.shipment || '—') + ticketField('تاريخ العملية',stamp(new Date(r.createdAt))) +
       ticketField('الوزنة الأولى',fmt(r.firstWeight)+' كجم') + ticketField('الوزنة الثانية',fmt(r.secondWeight)+' كجم') +
       '</div><div class="ticket-net"><small>صافي الحمولة</small><strong>' + fmt(r.netWeight) + ' كجم</strong></div><div class="ticket-footer">مصدر القراءة: ' + esc(r.source || 'غير محدد') + ' · راجع معايرة الميزان قبل الاستخدام التجاري أو القانوني</div></div>';
   }
