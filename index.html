@@ -56,14 +56,14 @@
               <div class="capacity-labels"><span>0 كجم</span><strong id="capacityPercent">21.38% من السعة</strong><span>500 طن</span></div>
             </div>
             <div class="manual-entry">
-              <div class="manual-entry-head"><div><strong>إدخال / تعديل الوزن يدويًا</strong><small>أدخل الوزن أو صحّح قراءة الميزان قبل اعتمادها</small></div><span class="manual-tag">MANUAL</span></div>
-              <div class="manual-weight-row"><input id="manualWeight" type="number" min="0" max="500000" step="0.01" placeholder="أدخل الوزن بالكيلوجرام" inputmode="decimal" /><button class="btn btn-primary" id="applyManualWeight" type="button">اعتماد الوزن</button></div>
-              <p class="manual-note">يمكن تصحيح قراءة الميزان يدويًا؛ سيحتفظ السجل بالقراءة الأصلية والوزن المعتمد بعد التعديل.</p>
+              <div class="manual-entry-head"><div><strong>إدخال / تعديل الوزن يدويًا</strong><small>اكتب الرقم وسيتم تحديث قراءة الميزان فورًا دون زر إضافي</small></div><span class="manual-tag">MANUAL</span></div>
+              <div class="manual-weight-row"><input id="manualWeight" type="number" min="0" max="500000" step="0.01" placeholder="أدخل الوزن بالكيلوجرام" inputmode="decimal" /></div>
+              <p class="manual-note">أدخل الوزن الأول أو الثاني مباشرة؛ القراءة تتحدث تلقائيًا بمجرد الكتابة.</p>
               <label class="weight-mode-label">مصدر الوزن<select id="weightMode"><option value="auto" selected>تلقائي — من الميزان المتصل</option><option value="manual">يدوي — إدخال الوزن بنفسك</option></select></label>
             </div>
             <div class="capture-area">
-              <div class="capture-title"><div><strong>تسجيل عملية وزن</strong><small>التذكرة تتكون من وزنتين لنفس السيارة</small></div><span class="step-pill" id="weighStep">الوزنة الأولى</span></div>
-              <div class="form-grid">
+              <div class="capture-title"><div><strong>تسجيل عملية وزن</strong><small id="captureHelp">أدخل بيانات العملية ثم سجّل الوزنة الأولى</small></div><span class="step-pill" id="weighStep">الوزنة الأولى</span></div>
+              <div class="form-grid" id="ticketDetailsFields">
                 <label>اسم العميل<input id="customerInput" placeholder="اسم العميل أو الشركة" /></label>
                 <label>اسم السائق<input id="driverInput" placeholder="اسم السائق" /></label>
                 <label class="full-field">اسم الشحنة<input id="shipmentInput" placeholder="اسم أو وصف الشحنة" /></label>
@@ -88,11 +88,12 @@
                 <label>رقم السيارة<input id="plateInput" placeholder="مثال: أ ب ج 1234" /></label>
                 <label>رقم المقطورة<input id="trailerInput" placeholder="رقم المقطورة" /></label>
               </div>
+              <div class="ticket-details-summary" id="ticketDetailsSummary" hidden></div>
               <div class="weigh-captures">
-                <div class="capture-box"><span>الوزنة الأولى</span><strong id="firstWeight">—</strong><small id="firstTime">لم تسجل بعد</small></div>
-                <div class="capture-arrow">←</div>
-                <div class="capture-box"><span>الوزنة الثانية</span><strong id="secondWeight">—</strong><small id="secondTime">لم تسجل بعد</small></div>
-                <div class="capture-box net-box"><span>صافي الحمولة</span><strong id="netWeight">—</strong><small>الفرق بين الوزنتين</small></div>
+                <div class="capture-box" id="firstCaptureBox"><span>الوزنة الأولى</span><strong id="firstWeight">—</strong><small id="firstTime">لم تسجل بعد</small></div>
+                <div class="capture-arrow" id="captureArrow" hidden>←</div>
+                <div class="capture-box" id="secondCaptureBox" hidden><span>الوزنة الثانية</span><strong id="secondWeight">—</strong><small id="secondTime">لم تسجل بعد</small></div>
+                <div class="capture-box net-box" id="netCaptureBox" hidden><span>صافي الحمولة</span><strong id="netWeight">—</strong><small>الفرق بين الوزنتين</small></div>
               </div>
               <div class="capture-buttons"><button class="btn btn-primary btn-large" id="captureWeight">تسجيل الوزنة الأولى</button><button class="btn btn-outline" id="resetTicket">عملية جديدة</button></div>
               <p class="inline-message" id="formMessage" role="status"></p>
@@ -101,7 +102,7 @@
 
           
         </div>
-        <section class="panel recent-panel"><div class="panel-heading"><div><span class="eyebrow">LATEST ACTIVITY</span><h3>أحدث عمليات الوزن</h3></div><button class="text-button" data-go="weighings">عرض الكل ←</button></div><div class="table-wrap"><table><thead><tr><th>رقم التذكرة</th><th>نوع الحركة</th><th>السيارة</th><th>المقطورة</th><th>العميل</th><th>السائق</th><th>الشحنة</th><th>الصافي</th><th>التاريخ</th></tr></thead><tbody id="recentTable"><tr class="empty-row"><td colspan="9">لا توجد عمليات مسجلة حتى الآن</td></tr></tbody></table></div></section>
+        <section class="panel recent-panel"><div class="panel-heading"><div><span class="eyebrow">LATEST ACTIVITY</span><h3>أحدث عمليات الوزن</h3></div><button class="text-button" data-go="weighings">عرض الكل ←</button></div><div class="table-wrap"><table><thead><tr><th>رقم التذكرة</th><th>نوع الحركة</th><th>السيارة</th><th>المقطورة</th><th>العميل</th><th>السائق</th><th>الشحنة</th><th>الصافي</th><th>التاريخ</th><th>ملف Excel</th></tr></thead><tbody id="recentTable"><tr class="empty-row"><td colspan="10">لا توجد عمليات مسجلة حتى الآن</td></tr></tbody></table></div></section>
       </section>
 
       <section class="view" id="view-weighings"><div class="section-intro"><div><h2>سجل عمليات الوزن</h2><p>جميع التذاكر المحفوظة محليًا، مع مزامنة تلقائية إلى ملف Excel في نسخة Windows.</p><small class="excel-sync-status" id="excelSyncStatus" role="status">جارٍ تجهيز ملف Excel...</small></div><div class="record-actions"><button class="btn btn-quiet" id="openExcelFile" type="button">فتح ملف Excel</button><button class="btn btn-outline" id="chooseExcelFile" type="button">تغيير مكان الملف</button><button class="btn btn-outline" id="exportRecords">تصدير CSV ↓</button><button class="btn btn-primary" id="exportExcel">تصدير Excel .xlsx ↓</button><button class="btn btn-danger-ghost" type="button" data-delete-all-records>حذف كل السجلات</button></div></div><div class="panel"><div class="toolbar"><div class="search-controls"><input id="recordSearch" class="search-input" placeholder="ابحث برقم التذكرة أو السيارة أو المقطورة أو العميل أو السائق أو الشحنة أو المحافظة أو نوع الحركة..." /><button class="btn btn-outline" type="button" id="clearRecordSearch">مسح البحث</button></div><span class="record-count" id="recordCount">0 عملية</span></div><div class="table-wrap"><table><thead><tr><th>رقم التذكرة</th><th>نوع الحركة</th><th>رقم السيارة</th><th>رقم المقطورة</th><th>السائق</th><th>العميل</th><th>اسم الشحنة</th><th>المحافظة</th><th>الوزن الأول</th><th>الوزن الثاني</th><th>الصافي</th><th>التاريخ</th><th>إجراء</th></tr></thead><tbody id="recordsTable"><tr class="empty-row"><td colspan="13">لا توجد عمليات مسجلة</td></tr></tbody></table></div></div></section>
