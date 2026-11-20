@@ -21,9 +21,7 @@
         <button class="nav-link" data-view="weighings"><span class="nav-icon">▤</span> سجل الوزن</button>
         <button class="nav-link" data-view="vehicles"><span class="nav-icon">▰</span> السيارات والعملاء</button>
         <button class="nav-link" data-view="reports"><span class="nav-icon">▥</span> التقارير</button>
-        <button class="nav-link" data-view="connections"><span class="nav-icon">⌁</span> الاتصال بالأجهزة</button>
-        <button class="nav-link" data-view="device-explorer"><span class="nav-icon">⌕</span> مستكشف الأجهزة والبروتوكولات</button>
-        <button class="nav-link" data-view="settings"><span class="nav-icon">⚙</span> الإعدادات</button>
+        <button class="nav-link" data-view="devices">الأجهزة والاتصال</button>
       </nav>
       <div class="sidebar-bottom">
         <div class="opensource-card"><span class="pulse-dot"></span><div><strong>نظام الوزن</strong><small id="sidebarDeviceStatus">بانتظار توصيل الميزان</small></div></div>
@@ -111,14 +109,12 @@
 
       <section class="view" id="view-reports"><div class="section-intro"><div><h2>التقارير والإحصائيات</h2><p>ابحث داخل جميع التذاكر؛ وستتغير الإجماليات والمتوسطات والرسم البياني حسب النتائج.</p></div><div class="record-actions"><button class="btn btn-danger-ghost" type="button" data-delete-all-records>حذف كل السجلات</button><button class="btn btn-outline" id="printReport">طباعة التقرير</button></div></div><div class="panel report-search-panel"><div class="toolbar"><div class="search-controls"><input id="reportSearch" class="search-input" placeholder="ابحث برقم التذكرة أو السيارة أو المقطورة أو السائق أو العميل أو الشحنة أو المحافظة أو نوع الحركة..." /><button class="btn btn-outline" type="button" id="clearReportSearch">مسح البحث</button></div><span class="record-count" id="reportResultCount">0 نتيجة</span></div></div><div class="stats-grid"><article class="stat-card"><div class="stat-icon teal">▤</div><div><span>إجمالي العمليات</span><strong id="reportCount">0</strong></div></article><article class="stat-card"><div class="stat-icon blue">▰</div><div><span>إجمالي صافي الوزن</span><strong id="reportNet">0 كجم</strong></div></article><article class="stat-card"><div class="stat-icon amber">◉</div><div><span>متوسط الحمولة</span><strong id="reportAverage">0 كجم</strong></div></article></div><div class="panel report-panel"><div class="panel-heading"><div><h3>ملخص آخر 7 أيام</h3><small>عدد عمليات الوزن المسجلة يوميًا</small></div></div><div class="chart" id="weeklyChart"><div class="chart-empty">ستظهر الإحصائيات بعد تسجيل عمليات الوزن.</div></div></div><div class="panel"><div class="panel-heading"><div><h3>السجلات المطابقة</h3><small>يمكنك فتح التذكرة أو حذف سجل محدد من نتائج البحث</small></div></div><div class="table-wrap"><table><thead><tr><th>رقم التذكرة</th><th>نوع الحركة</th><th>رقم السيارة</th><th>رقم المقطورة</th><th>السائق</th><th>العميل</th><th>اسم الشحنة</th><th>المحافظة</th><th>الوزن الأول</th><th>الوزن الثاني</th><th>الصافي</th><th>التاريخ</th><th>إجراء</th></tr></thead><tbody id="reportRecordsTable"><tr class="empty-row"><td colspan="13">لا توجد عمليات مسجلة</td></tr></tbody></table></div></div></section>
 
-      <section class="view" id="view-connections"><div class="section-intro"><div><h2>الاتصال بأجهزة الوزن</h2><p>وصّل كابل الميزان باللاب فقط؛ البرنامج يبحث تلقائيًا عن المنفذ وإعدادات الاتصال والبروتوكول.</p></div><span class="warning-pill">Universal Protocol Engine</span></div><div class="connection-grid"><article class="panel protocol-card selected"><div class="protocol-icon">⌁</div><h3>توصيل الميزان بالكابل</h3><p>يدعم محولات USB-to-RS232 وUSB Serial؛ بمجرد توصيلها باللاب يكتشف البرنامج منفذ COM ويحاول قراءة الوزن وضبط الإعدادات تلقائيًا.</p><div class="protocol-state auto-detection-status" id="serialState">بانتظار توصيل كابل الميزان — سيكتشف البرنامج المنفذ وإعدادات الاتصال تلقائيًا.</div><div class="auto-connection-actions"><button class="btn btn-primary" type="button" id="autoSerialSettings">بحث تلقائي عن الميزان</button><span>وصّل الكابل باللاب فقط؛ لا تحتاج لاختيار COM أو بروتوكول.</span></div><details class="advanced-connection-settings"><summary>إعدادات متقدمة (اختياري للدعم الفني)</summary><div class="serial-controls"><label>منفذ COM<select id="serialDevice"><option value="">اختر منفذ الميزان</option></select></label><div class="serial-buttons"><button class="btn btn-outline" type="button" id="refreshSerialPorts">تحديث قائمة المنافذ</button></div><label>ملف الإعدادات<select id="protocolProfile"><option value="auto" selected>اكتشاف تلقائي / عام</option><option value="rice-continuous">Rice Lake — Continuous ASCII</option><option value="rice-demand">Rice Lake — Demand / Request</option><option value="mettler">Mettler Toledo — ASCII (عام)</option><option value="avery">Avery Weigh-Tronix — ASCII (عام)</option><option value="cas">CAS — ASCII (عام)</option><option value="generic">مؤشر عام — ASCII</option><option value="yaohua-a9">YAOHUA XK3190-A9 / A9+ — إطار الوزن مع XOR</option><option value="stx-etx">STX / ETX Framing</option><option value="raw-stream">Raw ASCII Stream</option></select></label><label>سرعة الاتصال Baud Rate<input id="serialBaud" type="number" min="50" max="1000000" step="1" value="9600" /></label><div class="serial-config-grid"><label>Data Bits<select id="serialDataBits"><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8" selected>8</option></select></label><label>Parity<select id="serialParity"><option value="none">None</option><option value="even">Even</option><option value="odd">Odd</option><option value="mark">Mark</option><option value="space">Space</option></select></label><label>Stop Bits<select id="serialStopBits"><option value="1" selected>1</option><option value="2">2</option></select></label><label>Flow Control<select id="serialFlow"><option value="none">None</option><option value="hardware">Hardware (RTS/CTS)</option></select></label></div><label>طريقة فصل الرسائل<select id="serialMode"><option value="lines">CR أو LF</option><option value="yaohua-a9">YAOHUA A9 — إطار 12 بايت + XOR</option><option value="stx">STX … ETX</option><option value="continuous">تدفق مستمر / نافذة قراءة</option></select></label><label>وحدة الوزن الافتراضية<select id="serialUnit"><option value="auto" selected>تلقائي حسب الرسالة</option><option value="kg">kg</option><option value="lb">lb</option><option value="g">g</option><option value="ton">ton</option></select></label><div class="serial-buttons"><button class="btn btn-primary" id="serialConnect">اتصال يدوي (متقدم)</button><button class="btn btn-outline" id="serialDisconnect" disabled>قطع الاتصال</button></div></div></details></article><article class="panel protocol-card"><div class="protocol-icon">▣</div><h3>USB</h3><p>USB-to-Serial يعمل من خلال منفذ COM أعلاه. أجهزة USB HID المباشرة تحتاج تعريفًا خاصًا حسب الشركة.</p><div class="protocol-state">USB Serial مدعوم عبر COM</div><button class="btn btn-outline btn-block" type="button" id="usbHelp">عرض منافذ USB Serial</button></article><article class="panel protocol-card"><div class="protocol-icon">⌘</div><h3>Ethernet TCP/IP</h3><p>اتصال مباشر بعنوان IP ومنفذ TCP داخل الشبكة المحلية (نسخة Windows).</p><div class="protocol-state" id="tcpState">متاح في نسخة Windows</div><div class="serial-controls"><label>عنوان IP أو اسم الجهاز<input id="tcpHost" placeholder="192.168.1.100" /></label><label>Port<input id="tcpPort" type="number" min="1" max="65535" value="10001" /></label><div class="serial-buttons"><button class="btn btn-primary" id="tcpConnect">اتصال TCP</button><button class="btn btn-outline" id="tcpDisconnect" disabled>قطع الاتصال</button></div></div></article></div><div class="panel note-panel"><strong>ملاحظة فنية</strong><p>المحرك يوفّر يدعم التطبيق منافذ RS-232 وRS-485 ومحولات USB-to-Serial عبر COM، مع إعدادات Baud/Data/Parity/Stop وملفات ASCII وCR/LF وSTX/ETX. أسماء الشركات ملفات إعداد أولية وليست ضمانًا لبروتوكولها المغلق. أجهزة USB HID والبروتوكولات الثنائية أو الخاصة تحتاج Driver/Parser مناسبًا؛ لا يمكن ضمان قراءة كل جهاز دون مواصفاته أو اختبار فعلي.</p></div></section>
-
-
-      <section class="view" id="view-device-explorer">
-        <div class="section-intro device-explorer-intro">
+      
+      <section class="view" id="view-devices">
+        <div class="section-intro device-center-intro">
           <div>
-            <h2>مستكشف أجهزة وبروتوكولات الموازين</h2>
-            <p>اكتشاف منافذ الاتصال ومعرّفات الأجهزة، وحفظ عيّنات البيانات الخام لتحديد البروتوكول عند اختلافه.</p>
+            <h2>الأجهزة والاتصال</h2>
+            <p>إدارة اتصال الميزان، اكتشاف الأجهزة، فحص البروتوكولات وحفظ بيانات التشخيص من مكان واحد.</p>
             <small class="explorer-last-scan" id="explorerLastScan">لم يتم إجراء فحص بعد.</small>
           </div>
           <div class="record-actions">
@@ -127,26 +123,86 @@
           </div>
         </div>
 
-        <div class="stats-grid compact-stats device-explorer-stats">
-          <article class="stat-card"><div class="stat-icon teal">⌁</div><div><span>منافذ الاتصال المكتشفة</span><strong id="explorerPortCount">0</strong><small>COM / Serial المتاحة</small></div></article>
-          <article class="stat-card"><div class="stat-icon blue">▣</div><div><span>محولات USB معروفة</span><strong id="explorerUsbCount">0</strong><small>حسب معرّف الشركة VID</small></div></article>
-          <article class="stat-card"><div class="stat-icon amber">⌘</div><div><span>عيّنات البيانات المسجلة</span><strong id="explorerSampleCount">0</strong><small>من تدفق المنفذ الحالي</small></div></article>
-          <article class="stat-card"><div class="stat-icon purple">◎</div><div><span>حالة التسجيل</span><strong class="explorer-state-value" id="explorerCaptureStatus">متوقف</strong><small id="explorerCaptureHint">لا يتم تسجيل بيانات حاليًا</small></div></article>
+        <div class="integrated-summary-strip" aria-label="ملخص الأجهزة">
+          <div><span>منافذ الاتصال</span><strong id="explorerPortCount">0</strong></div>
+          <div><span>محولات USB المعروفة</span><strong id="explorerUsbCount">0</strong></div>
+          <div><span>عينات البيانات المحفوظة</span><strong id="explorerSampleCount">0</strong></div>
+          <div><span>حالة تسجيل البيانات</span><strong id="explorerCaptureStatus">متوقف</strong><small id="explorerCaptureHint">لا يتم تسجيل بيانات حاليًا</small></div>
         </div>
 
-        <div class="panel explorer-notice">
-          <div class="explorer-notice-icon">i</div>
-          <div>
-            <strong>ما الذي يتعرف عليه المستكشف؟</strong>
-            <p>يعرض بيانات منفذ COM والشركة المصنّعة ومعرّفات USB المتاحة، ثم يسجل البيانات الواردة ويقارن شكلها بالتنسيقات المعروفة. اسم شريحة USB مثل CH340 أو FTDI هو اسم محول الاتصال، وليس بالضرورة اسم بروتوكول مؤشر الميزان.</p>
-          </div>
-          <span class="warning-pill" id="explorerRuntimeStatus">جارٍ تحديد بيئة التشغيل</span>
+        <div class="integrated-connection-grid">
+          <section class="panel integrated-serial-panel">
+            <div class="panel-heading">
+              <div><span class="eyebrow">USB / RS-232 / RS-485</span><h3>الاتصال التسلسلي بالميزان</h3></div>
+              <span class="mini-status" id="serialState">بانتظار توصيل كابل الميزان</span>
+            </div>
+            <p class="integrated-description">وصّل كابل الميزان أو محول USB-to-Serial بالكمبيوتر. يبدأ البرنامج البحث عن المنفذ وإعدادات القراءة تلقائيًا.</p>
+            <div class="integrated-main-actions">
+              <button class="btn btn-primary btn-large" type="button" id="autoSerialSettings">بحث تلقائي عن الميزان</button>
+              <button class="btn btn-outline" type="button" id="usbHelp">تحديث معلومات USB</button>
+            </div>
+            <details class="advanced-connection-settings">
+              <summary>إعدادات الاتصال المتقدمة</summary>
+              <div class="serial-controls">
+                <label>منفذ COM<select id="serialDevice"><option value="">اختر منفذ الميزان</option></select></label>
+                <div class="serial-buttons"><button class="btn btn-outline" type="button" id="refreshSerialPorts">تحديث قائمة المنافذ</button></div>
+                <label>ملف البروتوكول
+                  <select id="protocolProfile">
+                    <option value="auto" selected>اكتشاف تلقائي / عام</option>
+                    <option value="rice-continuous">Rice Lake — Continuous ASCII</option>
+                    <option value="rice-demand">Rice Lake — Demand / Request</option>
+                    <option value="mettler">Mettler Toledo — ASCII (عام)</option>
+                    <option value="avery">Avery Weigh-Tronix — ASCII (عام)</option>
+                    <option value="cas">CAS — ASCII (عام)</option>
+                    <option value="generic">مؤشر عام — ASCII</option>
+                    <option value="yaohua-a9">YAOHUA XK3190-A9 / A9+ — إطار الوزن مع XOR</option>
+                    <option value="stx-etx">STX / ETX Framing</option>
+                    <option value="raw-stream">Raw ASCII Stream</option>
+                  </select>
+                </label>
+                <label>سرعة الاتصال Baud Rate<input id="serialBaud" type="number" min="50" max="1000000" step="1" value="9600" /></label>
+                <div class="serial-config-grid">
+                  <label>Data Bits<select id="serialDataBits"><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8" selected>8</option></select></label>
+                  <label>Parity<select id="serialParity"><option value="none">None</option><option value="even">Even</option><option value="odd">Odd</option><option value="mark">Mark</option><option value="space">Space</option></select></label>
+                  <label>Stop Bits<select id="serialStopBits"><option value="1" selected>1</option><option value="2">2</option></select></label>
+                  <label>Flow Control<select id="serialFlow"><option value="none">None</option><option value="hardware">Hardware (RTS/CTS)</option></select></label>
+                </div>
+                <label>طريقة فصل الرسائل<select id="serialMode"><option value="lines">CR أو LF</option><option value="yaohua-a9">YAOHUA A9 — إطار 12 بايت + XOR</option><option value="stx">STX … ETX</option><option value="continuous">تدفق مستمر / نافذة قراءة</option></select></label>
+                <label>وحدة الوزن الافتراضية<select id="serialUnit"><option value="auto" selected>تلقائي حسب الرسالة</option><option value="kg">kg</option><option value="lb">lb</option><option value="g">g</option><option value="ton">ton</option></select></label>
+                <div class="serial-buttons"><button class="btn btn-primary" id="serialConnect">اتصال يدوي</button><button class="btn btn-outline" id="serialDisconnect" disabled>قطع الاتصال</button></div>
+              </div>
+            </details>
+            <p class="explorer-footnote">USB Serial وUSB-to-RS232 يظهران عادةً كمنفذ COM. أجهزة USB HID المباشرة قد تحتاج تعريفًا أو محلّلًا خاصًا بالشركة.</p>
+          </section>
+
+          <section class="panel integrated-tcp-panel">
+            <div class="panel-heading">
+              <div><span class="eyebrow">ETHERNET</span><h3>اتصال الشبكة TCP/IP</h3></div>
+              <span class="mini-status">نسخة Windows</span>
+            </div>
+            <p class="integrated-description">استخدم هذا الاتصال عندما يرسل مؤشر الميزان قراءاته عبر الشبكة المحلية.</p>
+            <div class="serial-controls">
+              <label>عنوان IP أو اسم الجهاز<input id="tcpHost" placeholder="192.168.1.100" /></label>
+              <label>منفذ TCP<input id="tcpPort" type="number" min="1" max="65535" value="10001" /></label>
+              <div class="integrated-tcp-status" id="tcpState">متاح في نسخة Windows</div>
+              <div class="serial-buttons"><button class="btn btn-primary" id="tcpConnect">اتصال TCP</button><button class="btn btn-outline" id="tcpDisconnect" disabled>قطع الاتصال</button></div>
+            </div>
+            <div class="integrated-technical-note">
+              <strong>ملاحظة التوافق</strong>
+              <p>تتوفر إعدادات RS-232 وRS-485 وUSB Serial وTCP. أسماء الشركات في ملفات الإعدادات هي تنسيقات أولية، ولا تضمن قراءة البروتوكولات المغلقة أو أجهزة USB HID دون مواصفاتها واختبارها.</p>
+            </div>
+          </section>
         </div>
 
-        <div class="device-explorer-grid">
+        <div class="explorer-section-heading">
+          <div><h3>اكتشاف الأجهزة</h3><p>قائمة المنافذ المتاحة وبيانات المحول الذي يتعرف عليه نظام التشغيل.</p></div>
+          <span class="mini-status" id="explorerRuntimeStatus">جارٍ تحديد بيئة التشغيل</span>
+        </div>
+
+        <div class="integrated-device-grid">
           <section class="panel">
             <div class="panel-heading">
-              <div><span class="eyebrow">HARDWARE DISCOVERY</span><h3>الأجهزة والمنافذ المكتشفة</h3></div>
+              <div><span class="eyebrow">AVAILABLE PORTS</span><h3>الأجهزة والمنافذ المكتشفة</h3></div>
               <span class="mini-status" id="explorerDeviceStatus">بانتظار الفحص</span>
             </div>
             <div class="table-wrap">
@@ -155,41 +211,41 @@
                 <tbody id="explorerPortsTable"><tr class="empty-row"><td colspan="6">اضغط «فحص الأجهزة والمنافذ» لعرض الأجهزة المتاحة.</td></tr></tbody>
               </table>
             </div>
-            <p class="explorer-footnote">قد يظهر الجهاز باسم USB Serial Device أو باسم شريحة التحويل فقط. لا يمكن الجزم بموديل الميزان من منفذ USB وحده.</p>
+            <p class="explorer-footnote">قد يظهر الجهاز باسم USB Serial Device أو باسم شريحة التحويل فقط. هذا يحدد محول الاتصال ولا يثبت وحده نوع بروتوكول مؤشر الميزان.</p>
           </section>
 
           <section class="panel explorer-selected-panel">
             <div class="panel-heading">
-              <div><span class="eyebrow">SELECTED DEVICE</span><h3>تفاصيل الجهاز المحدد</h3></div>
+              <div><span class="eyebrow">DEVICE DETAILS</span><h3>تفاصيل الجهاز المحدد</h3></div>
               <span class="mini-status" id="explorerSelectedBadge">لا يوجد تحديد</span>
             </div>
             <div class="explorer-selected-device" id="explorerSelectedDevice">
-              <div class="explorer-empty-icon">⌁</div>
-              <strong>لم يتم اختيار جهاز</strong>
-              <span>نفّذ الفحص ثم اختر أحد المنافذ من الجدول.</span>
+              <div class="explorer-empty-state"><strong>لم يتم اختيار جهاز</strong><span>نفّذ الفحص ثم اختر أحد المنافذ من الجدول.</span></div>
             </div>
             <div class="explorer-capture-controls">
               <div>
                 <strong>تسجيل البيانات الواردة</strong>
-                <small>يسجل المستكشف البيانات التي تمر عبر اتصال الميزان الحالي أو أثناء البحث التلقائي من صفحة الاتصال.</small>
+                <small>يسجل البيانات التي تمر عبر اتصال الميزان الحالي أو أثناء البحث التلقائي، ولا يفتح منفذًا ثانيًا.</small>
               </div>
               <div class="serial-buttons">
                 <button class="btn btn-primary" type="button" id="explorerCaptureStart">بدء تسجيل البيانات</button>
                 <button class="btn btn-outline" type="button" id="explorerCaptureStop" disabled>إيقاف التسجيل</button>
               </div>
             </div>
-            <p class="explorer-capture-message" id="explorerCaptureMessage" role="status">ابدأ التسجيل هنا، ثم شغّل الاتصال أو البحث التلقائي من صفحة «الاتصال بالأجهزة». المستكشف لا يفتح منفذًا ثانيًا ولا يغيّر اتصال الميزان.</p>
+            <p class="explorer-capture-message" id="explorerCaptureMessage" role="status">ابدأ التسجيل، ثم شغّل البحث التلقائي أو الاتصال اليدوي من نفس الصفحة.</p>
           </section>
         </div>
 
-        <div class="device-explorer-grid explorer-analysis-grid">
+        <div class="explorer-section-heading">
+          <div><h3>تشخيص البروتوكول والبيانات</h3><p>تحليل القراءة المستقبلة وحفظ شكل البيانات حتى عند عدم التعرف على البروتوكول.</p></div>
+        </div>
+        <div class="integrated-analysis-grid">
           <section class="panel">
             <div class="panel-heading">
               <div><span class="eyebrow">PROTOCOL ANALYSIS</span><h3>نتيجة التعرف على البروتوكول</h3></div>
               <span class="mini-status" id="explorerProtocolBadge">لم تصل بيانات</span>
             </div>
             <div class="explorer-protocol-result">
-              <div class="explorer-protocol-mark">⌘</div>
               <div>
                 <small>أقرب تنسيق تم التعرف عليه</small>
                 <strong id="explorerProtocolName">لم يتم التعرف عليه بعد</strong>
@@ -201,16 +257,15 @@
               <div><span>آخر وزن قابل للاستخراج</span><strong id="explorerProtocolWeight">—</strong></div>
               <div><span>آخر منفذ مصدر</span><strong id="explorerProtocolPort">—</strong></div>
             </div>
-            <p class="explorer-footnote">التعرف على شكل البيانات لا يضمن دعم بروتوكول مغلق بالكامل. عند ظهور «غير معروف»، احتفظ بالتقرير وأرسله للدعم لإضافة محلّل مناسب.</p>
+            <p class="explorer-footnote">التعرف على شكل البيانات لا يضمن دعم بروتوكول مغلق بالكامل. عند ظهور «غير معروف»، صدّر التقرير لإضافة محلّل مناسب بعد مراجعة البيانات.</p>
           </section>
-
           <section class="panel">
             <div class="panel-heading">
-              <div><span class="eyebrow">RAW DATA MONITOR</span><h3>آخر بيانات خام مستقبلة</h3></div>
-              <span class="mini-status" id="explorerRawSize">0 حرف</span>
+              <div><span class="eyebrow">RAW DATA</span><h3>آخر بيانات خام مستقبلة</h3></div>
+              <span class="mini-status" id="explorerRawSize">0 بايت</span>
             </div>
             <pre class="explorer-raw-output" id="explorerRawPreview">لا توجد بيانات مستقبلة حتى الآن.</pre>
-            <div class="explorer-raw-legend"><span><i class="raw-dot"></i> النص المستلم</span><span>يتم إظهار محارف التحكم بصيغة \r و \n و \x02</span></div>
+            <div class="explorer-raw-legend"><span>النص المستلم وتمثيل HEX</span><span>تظهر محارف التحكم بصيغة مرئية</span></div>
           </section>
         </div>
 
@@ -226,9 +281,20 @@
             </table>
           </div>
         </section>
+
+        <details class="system-settings-details">
+          <summary>إعدادات البرنامج العامة</summary>
+          <div class="panel settings-panel">
+            <div class="settings-row"><div><strong>اسم النظام</strong><small>الاسم الظاهر في الواجهة والتذاكر</small></div><input id="systemName" value="Weighbridge 120T" /></div>
+            <div class="settings-row"><div><strong>السعة القصوى</strong><small>الحد الأعلى للوزن بالكيلوجرام</small></div><div class="setting-value">500,000 كجم <span>500 طن</span></div></div>
+            <div class="settings-row"><div><strong>وحدة القياس</strong><small>الوحدة الأساسية للقراءات</small></div><div class="setting-value">كيلوجرام (KG)</div></div>
+            <div class="settings-row"><div><strong>تخزين البيانات</strong><small id="storageDescription">تُحفظ البيانات محليًا داخل المتصفح</small></div><span class="storage-badge" id="storageMode">Local Storage</span></div>
+            <div class="settings-actions"><button class="btn btn-primary" id="saveSettings">حفظ الإعدادات</button><button class="btn btn-danger-ghost" id="clearData">مسح بيانات التجربة</button></div>
+            <p class="inline-message" id="settingsMessage" role="status"></p>
+          </div>
+        </details>
       </section>
 
-      <section class="view" id="view-settings"><div class="section-intro"><div><h2>إعدادات النظام</h2><p>إعدادات عامة للنسخة التجريبية.</p></div></div><div class="panel settings-panel"><div class="settings-row"><div><strong>اسم النظام</strong><small>الاسم الظاهر في الواجهة والتذاكر</small></div><input id="systemName" value="Weighbridge 120T" /></div><div class="settings-row"><div><strong>السعة القصوى</strong><small>الحد الأعلى للوزن بالكيلوجرام</small></div><div class="setting-value">500,000 كجم <span>500 طن</span></div></div><div class="settings-row"><div><strong>وحدة القياس</strong><small>الوحدة الأساسية للقراءات</small></div><div class="setting-value">كيلوجرام (KG)</div></div><div class="settings-row"><div><strong>تخزين البيانات</strong><small id="storageDescription">تُحفظ البيانات محليًا داخل المتصفح</small></div><span class="storage-badge" id="storageMode">Local Storage</span></div><div class="settings-actions"><button class="btn btn-primary" id="saveSettings">حفظ الإعدادات</button><button class="btn btn-danger-ghost" id="clearData">مسح بيانات التجربة</button></div><p class="inline-message" id="settingsMessage" role="status"></p></div></section>
       <footer class="app-footer"><span>WEIGHBRIDGE 120T</span><span>نسخة ويب تجريبية · البيانات محفوظة على هذا المتصفح</span></footer>
     </main>
   </div>
