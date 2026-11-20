@@ -329,8 +329,9 @@
     }
     const last = deviceExplorerSamples[deviceExplorerSamples.length - 1];
     if (last) {
-      $('explorerRawPreview').textContent = last.readable || 'وصلت بيانات غير قابلة للعرض النصي.';
-      $('explorerRawSize').textContent = (last.rawLength || 0) + ' حرف';
+      const hexPreview = last.hex ? last.hex.match(/.{1,2}/g).slice(0, 160).join(' ') : 'غير متاح';
+      $('explorerRawPreview').textContent = (last.readable || 'وصلت بيانات غير قابلة للعرض النصي.') + '\\nHEX: ' + hexPreview;
+      $('explorerRawSize').textContent = (last.rawLength || 0) + ' بايت';
     } else {
       $('explorerRawPreview').textContent = 'لا توجد بيانات مستقبلة حتى الآن.';
       $('explorerRawSize').textContent = '0 حرف';
@@ -392,8 +393,9 @@
   }
   function recordDeviceExplorerData(data) {
     if (!deviceExplorerCaptureActive) return;
-    const raw = String(data ?? '');
-    if (!raw) return;
+    const payload = data && typeof data === 'object' ? data : { text: String(data ?? '') };
+    const raw = String(payload.text ?? '');
+    if (!raw && !payload.hex && !payload.base64) return;
     deviceExplorerRawBuffer = (deviceExplorerRawBuffer + raw).slice(-2048);
     const detected = classifyExplorerProtocol(deviceExplorerRawBuffer, raw);
     const weight = detected.weight;
@@ -412,8 +414,10 @@
       protocol: detected.name,
       confidence: detected.confidence,
       weight,
-      rawLength: raw.length,
+      rawLength: Number(payload.byteLength ?? raw.length),
       raw: raw.slice(0, 1500),
+      hex: String(payload.hex || ''),
+      base64: String(payload.base64 || ''),
       readable: explorerReadableData(raw).slice(0, 1200),
       preview
     };
@@ -482,7 +486,7 @@
       detectedPorts: deviceExplorerPorts,
       lastProtocolDetection: deviceExplorerLastProtocol,
       capturedSamples: deviceExplorerSamples,
-      note: 'USB vendor/chipset identity does not by itself prove the scale indicator protocol. Samples are the UTF-8 text delivered to the application serial listener.'
+      note: 'USB vendor/chipset identity does not by itself prove the scale indicator protocol. Windows samples include the UTF-8 text and original serial bytes as HEX/Base64; Web Serial samples include the bytes exposed by the browser.'
     };
     const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json;charset=utf-8' });
     const url = URL.createObjectURL(blob);
@@ -965,7 +969,10 @@
           const result = await serialReader.read();
           if (result.done) break;
           const incoming = new TextDecoder().decode(result.value);
-          recordDeviceExplorerData(incoming);
+          const bytes = Array.from(result.value);
+          let base64 = '';
+          try { base64 = btoa(bytes.map(byte => String.fromCharCode(byte)).join('')); } catch {}
+          recordDeviceExplorerData({ text: incoming, byteLength: bytes.length, hex: bytes.map(byte => byte.toString(16).padStart(2, '0')).join(''), base64 });
           buffer += incoming;
           if ($('protocolProfile').value === 'yaohua-a9') {
             const extracted = extractYaohuaA9Frames(buffer);
@@ -1492,9 +1499,10 @@
     });
 
     window.desktopBridge.onSerialData(data => {
+      const incoming = typeof data === 'string' ? data : String(data?.text ?? '');
       recordDeviceExplorerData(data);
-      if (autoScanAttemptActive) consumeAutoScanData(data);
-      else consumeDesktopSerialData(data);
+      if (autoScanAttemptActive) consumeAutoScanData(incoming);
+      else consumeDesktopSerialData(incoming);
     });
     window.desktopBridge.onSerialError(error => {
       if (!autoScanAttemptActive) $('serialState').textContent = 'خطأ في منفذ COM: ' + error;
