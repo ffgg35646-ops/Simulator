@@ -229,7 +229,7 @@ ipcMain.handle('serial:open', async (_event, config) => {
   });
   await new Promise((resolve, reject) => port.open(error => error ? reject(error) : resolve()));
   serialDevice = port;
-  port.on('data', chunk => mainWindow?.webContents.send('serial:data', chunk.toString('utf8')));
+  port.on('data', chunk => mainWindow?.webContents.send('serial:data', { text: chunk.toString('utf8'), hex: chunk.toString('hex'), base64: chunk.toString('base64'), byteLength: chunk.length }));
   port.on('error', error => mainWindow?.webContents.send('serial:error', error.message));
   port.on('close', () => { mainWindow?.webContents.send('serial:closed'); if (serialDevice === port) serialDevice = null; });
   return { connected: true, path: portPath };
