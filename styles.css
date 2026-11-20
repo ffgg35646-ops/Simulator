@@ -105,3 +105,60 @@
 @media(max-width:1100px){.device-explorer-grid,.explorer-analysis-grid{grid-template-columns:1fr}}
 @media(max-width:850px){.device-explorer-stats{grid-template-columns:repeat(2,minmax(0,1fr))}.explorer-notice{align-items:flex-start;flex-wrap:wrap}.explorer-notice .warning-pill{margin-right:47px}}
 @media(max-width:600px){.device-explorer-intro{flex-direction:column}.device-explorer-intro .record-actions{width:100%}.device-explorer-intro .record-actions .btn{flex:1}.explorer-protocol-meta{grid-template-columns:1fr}.explorer-capture-controls .serial-buttons{flex-direction:column}.explorer-capture-controls .serial-buttons .btn{width:100%}.explorer-selected-device{grid-template-columns:1fr 1fr}}
+
+
+/* Unified devices, connection and settings workspace */
+.device-center-intro{align-items:flex-start}
+.device-center-intro .record-actions{justify-content:flex-end}
+.integrated-summary-strip{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px;margin:0 0 15px}
+.integrated-summary-strip>div{min-width:0;padding:12px 15px;background:#111c26;border:1px solid #243542;border-radius:11px}
+.integrated-summary-strip span,.integrated-summary-strip strong,.integrated-summary-strip small{display:block}
+.integrated-summary-strip span{font-size:9px;color:#8fa1ad}
+.integrated-summary-strip strong{font-size:17px;color:#e7f1f3;margin-top:3px}
+.integrated-summary-strip small{margin-top:2px;font-size:8px;color:#718792}
+.integrated-connection-grid{display:grid;grid-template-columns:minmax(0,1.25fr) minmax(290px,.75fr);gap:14px;align-items:start}
+.integrated-connection-grid>.panel{margin-bottom:15px}
+.integrated-description{font-size:10px;line-height:1.9;color:#8fa2ad;margin:0 0 12px}
+.integrated-main-actions{display:flex;align-items:center;gap:9px;flex-wrap:wrap}
+.integrated-serial-panel .protocol-state{margin:0 0 10px}
+.integrated-tcp-status{padding:9px 11px;background:#0e1a22;border:1px solid #2a3e49;border-radius:8px;color:#9db0b8;font-size:10px}
+.integrated-technical-note{margin-top:17px;padding:12px 13px;border-right:2px solid #45616b;background:#121f28;border-radius:7px}
+.integrated-technical-note strong{font-size:10px;color:#cbd9dd}
+.integrated-technical-note p{margin:5px 0 0;font-size:9px;line-height:1.9;color:#869ca6}
+.integrated-device-grid{display:grid;grid-template-columns:minmax(0,1.1fr) minmax(310px,.9fr);gap:14px;align-items:stretch}
+.integrated-device-grid>.panel,.integrated-analysis-grid>.panel{margin-bottom:15px}
+.explorer-section-heading{display:flex;align-items:center;justify-content:space-between;gap:12px;margin:20px 1px 11px}
+.explorer-section-heading h3{font-size:14px;margin:0}
+.explorer-section-heading p{font-size:10px;color:#8297a1;margin:3px 0 0}
+.integrated-analysis-grid{display:grid;grid-template-columns:1fr 1fr;gap:14px;align-items:stretch}
+.explorer-notice-icon,.explorer-protocol-mark,.explorer-empty-icon,.protocol-icon{display:none!important}
+.integrated-summary-strip .stat-icon{display:none}
+.explorer-selected-device{min-height:145px}
+.explorer-selected-device .explorer-empty-state{min-height:115px}
+.system-settings-details{margin:2px 0 17px;border:1px solid #263b47;border-radius:12px;background:#111c26;overflow:hidden}
+.system-settings-details>summary{list-style:none;cursor:pointer;padding:14px 16px;color:#d1dfe3;font-size:11px;font-weight:700;display:flex;align-items:center;justify-content:space-between}
+.system-settings-details>summary::-webkit-details-marker{display:none}
+.system-settings-details>summary:after{content:'+';font-size:17px;color:#91a7af;font-weight:400}
+.system-settings-details[open]>summary:after{content:'−'}
+.system-settings-details .settings-panel{max-width:none;margin:0;border:0;border-top:1px solid #263b47;border-radius:0;background:#101b24;padding:8px 17px 17px}
+.system-settings-details .settings-row:first-child{padding-top:13px}
+.system-settings-details .settings-actions{flex-wrap:wrap}
+.device-center-intro .warning-pill{display:none}
+.device-center-intro .eyebrow{margin-bottom:5px}
+@media(max-width:1100px){
+ .integrated-connection-grid,.integrated-device-grid,.integrated-analysis-grid{grid-template-columns:1fr}
+}
+@media(max-width:850px){
+ .integrated-summary-strip{grid-template-columns:repeat(2,minmax(0,1fr))}
+ .device-center-intro{align-items:flex-start}
+}
+@media(max-width:600px){
+ .device-center-intro{flex-direction:column}
+ .device-center-intro .record-actions{width:100%}
+ .device-center-intro .record-actions .btn{flex:1}
+ .integrated-summary-strip{gap:7px}
+ .integrated-summary-strip>div{padding:10px}
+ .integrated-main-actions{align-items:stretch;flex-direction:column}
+ .integrated-main-actions .btn{width:100%}
+ .explorer-section-heading{align-items:flex-start;flex-direction:column}
+}
