@@ -28,6 +28,17 @@
   let lastPortsSignature = null;
 
   const desktop = window.desktopBridge && window.desktopBridge.isDesktop;
+  const DEVICE_EXPLORER_KEY = 'weighbridge120t.deviceExplorer.v1';
+  const savedDeviceExplorer = readJSON(DEVICE_EXPLORER_KEY, {});
+  let deviceExplorerPorts = Array.isArray(savedDeviceExplorer.ports) ? savedDeviceExplorer.ports : [];
+  let deviceExplorerSamples = Array.isArray(savedDeviceExplorer.samples) ? savedDeviceExplorer.samples : [];
+  let deviceExplorerScanAt = savedDeviceExplorer.scanAt || '';
+  let deviceExplorerSelectedPath = '';
+  let deviceExplorerCaptureActive = false;
+  let deviceExplorerRawBuffer = '';
+  let deviceExplorerLastProtocol = savedDeviceExplorer.lastProtocol || null;
+  let deviceExplorerCurrentConfig = null;
+  let deviceExplorerSaveCounter = 0;
   function readJSON(key, fallback) {
     try {
       const stored = desktop ? window.desktopBridge.getItem(key) : localStorage.getItem(key);
@@ -188,6 +199,313 @@
   }
   function ticketField(label, value) { return '<div class="ticket-field"><small>'+esc(label)+'</small><strong>'+esc(String(value))+'</strong></div>'; }
   function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+  const explorerUsbVendors = {
+    '1a86': 'QinHeng / CH340-CH341',
+    '0403': 'FTDI',
+    '067b': 'Prolific PL2303',
+    '10c4': 'Silicon Labs CP210x',
+    '2341': 'Arduino USB Serial',
+    '2e8a': 'Raspberry Pi / RP2040',
+    '1b4f': 'SparkFun USB Serial'
+  };
+  function explorerHexId(value) {
+    if (value === undefined || value === null || value === '') return '—';
+    const clean = String(value).replace(/^0x/i, '').toLowerCase();
+    return clean ? clean.padStart(4, '0') : '—';
+  }
+  function explorerPortVendor(port) {
+    const vendorId = explorerHexId(port.vendorId);
+    return explorerUsbVendors[vendorId] || port.manufacturer || (port.pnpId ? 'جهاز USB غير محدد' : 'منفذ تسلسلي');
+  }
+  function explorerPortType(port) {
+    const vendorId = explorerHexId(port.vendorId);
+    if (explorerUsbVendors[vendorId]) return 'USB-Serial';
+    if (port.vendorId || port.productId || /USB/i.test(String(port.pnpId || ''))) return 'USB غير معروف';
+    return 'Serial';
+  }
+  function saveDeviceExplorerState() {
+    try {
+      writeJSON(DEVICE_EXPLORER_KEY, {
+        ports: deviceExplorerPorts,
+        samples: deviceExplorerSamples,
+        scanAt: deviceExplorerScanAt,
+        lastProtocol: deviceExplorerLastProtocol
+      });
+    } catch (error) {
+      const message = $('explorerCaptureMessage');
+      if (message) message.textContent = 'تعذر حفظ سجل التشخيص محليًا: ' + (error?.message || String(error));
+    }
+  }
+  function renderDeviceExplorerPorts() {
+    const body = $('explorerPortsTable');
+    if (!body) return;
+    $('explorerPortCount').textContent = String(deviceExplorerPorts.length);
+    $('explorerUsbCount').textContent = String(deviceExplorerPorts.filter(port => explorerPortType(port) === 'USB-Serial').length);
+    $('explorerDeviceStatus').textContent = deviceExplorerPorts.length ? 'تم اكتشاف ' + deviceExplorerPorts.length + ' منفذ' : 'لا توجد منافذ';
+    $('explorerLastScan').textContent = deviceExplorerScanAt
+      ? 'آخر فحص: ' + stamp(new Date(deviceExplorerScanAt))
+      : 'لم يتم إجراء فحص بعد.';
+    if (!deviceExplorerPorts.some(port => port.path === deviceExplorerSelectedPath)) {
+      deviceExplorerSelectedPath = deviceExplorerPorts[0]?.path || '';
+    }
+    if (!deviceExplorerPorts.length) {
+      body.innerHTML = '<tr class="empty-row"><td colspan="6">لم يتم العثور على منفذ متاح. افحص الكابل وتعريف المحول ثم أعد الفحص.</td></tr>';
+      renderDeviceExplorerSelected();
+      return;
+    }
+    body.innerHTML = deviceExplorerPorts.map(port => {
+      const path = String(port.path || 'Serial');
+      const vendor = explorerPortVendor(port);
+      const vid = explorerHexId(port.vendorId);
+      const pid = explorerHexId(port.productId);
+      const isSelected = path === deviceExplorerSelectedPath;
+      const connected = Boolean(serialPort && serialPort.path === path && !serialPort.autoPending);
+      const kind = explorerPortType(port);
+      return '<tr class="' + (isSelected ? 'explorer-selected-row' : '') + '">' +
+        '<td><button class="table-action explorer-select-port" type="button" data-explorer-port="' + esc(path) + '">' + esc(path) + '</button>' +
+        (connected ? '<span class="explorer-subtext">اتصال الميزان الحالي</span>' : '') + '</td>' +
+        '<td><span class="explorer-vendor">' + esc(vendor) + '</span><span class="explorer-subtext">' + esc(port.friendlyName || port.pnpId || 'لا يوجد وصف إضافي من نظام التشغيل') + '</span></td>' +
+        '<td><span dir="ltr">' + esc(vid) + ' : ' + esc(pid) + '</span></td>' +
+        '<td>' + esc(port.serialNumber || 'غير متاح') + '</td>' +
+        '<td><span class="explorer-type-tag ' + (kind === 'USB-Serial' ? '' : 'unknown') + '">' + esc(kind) + '</span></td>' +
+        '<td><button class="table-action" type="button" data-explorer-port="' + esc(path) + '">عرض</button></td>' +
+        '</tr>';
+    }).join('');
+    renderDeviceExplorerSelected();
+  }
+  function renderDeviceExplorerSelected() {
+    const host = $('explorerSelectedDevice');
+    if (!host) return;
+    const port = deviceExplorerPorts.find(item => item.path === deviceExplorerSelectedPath);
+    if (!port) {
+      host.innerHTML = '<div class="explorer-empty-state"><div class="explorer-empty-icon">⌁</div><strong>لم يتم اختيار جهاز</strong><span>نفّذ الفحص ثم اختر أحد المنافذ من الجدول.</span></div>';
+      $('explorerSelectedBadge').textContent = 'لا يوجد تحديد';
+      return;
+    }
+    const connected = Boolean(serialPort && serialPort.path === port.path && !serialPort.autoPending);
+    $('explorerSelectedBadge').textContent = connected ? 'متصل حاليًا' : 'منفذ مكتشف';
+    host.innerHTML = [
+      ['المنفذ', port.path || 'غير معروف'],
+      ['الشركة / الشريحة', explorerPortVendor(port)],
+      ['معرّف VID', explorerHexId(port.vendorId)],
+      ['معرّف PID', explorerHexId(port.productId)],
+      ['الرقم التسلسلي', port.serialNumber || 'غير متاح'],
+      ['معرّف PnP', port.pnpId || 'غير متاح'],
+      ['موقع الجهاز', port.locationId || 'غير متاح'],
+      ['الحالة', connected ? 'اتصال مستخدم حاليًا' : 'مكتشف — ليس بالضرورة متصلًا بالمؤشر']
+    ].map(item => '<div><small>' + esc(item[0]) + '</small><strong>' + esc(String(item[1])) + '</strong></div>').join('');
+  }
+  function renderDeviceExplorerProtocol() {
+    const info = deviceExplorerLastProtocol;
+    if (!info) {
+      $('explorerProtocolName').textContent = 'لم يتم التعرف عليه بعد';
+      $('explorerProtocolDescription').textContent = 'يلزم استقبال بيانات فعلية من مؤشر الميزان قبل تحديد تنسيق الرسائل.';
+      $('explorerProtocolBadge').textContent = 'لم تصل بيانات';
+      $('explorerProtocolConfidence').textContent = '—';
+      $('explorerProtocolWeight').textContent = '—';
+      $('explorerProtocolPort').textContent = '—';
+      return;
+    }
+    $('explorerProtocolName').textContent = info.name;
+    $('explorerProtocolDescription').textContent = info.description;
+    $('explorerProtocolBadge').textContent = info.confidence;
+    $('explorerProtocolConfidence').textContent = info.confidence;
+    $('explorerProtocolWeight').textContent = info.weight == null ? 'لا توجد قراءة' : fmt(info.weight) + ' كجم';
+    $('explorerProtocolPort').textContent = info.port || 'غير معروف';
+  }
+  function renderDeviceExplorerSamples() {
+    $('explorerSampleCount').textContent = String(deviceExplorerSamples.length);
+    const body = $('explorerSamplesTable');
+    if (!body) return;
+    if (!deviceExplorerSamples.length) {
+      body.innerHTML = '<tr class="empty-row"><td colspan="6">لم يتم تسجيل عينات بعد.</td></tr>';
+    } else {
+      body.innerHTML = deviceExplorerSamples.slice(-35).reverse().map(sample => {
+        const time = sample.at ? stamp(new Date(sample.at)) : '—';
+        const config = sample.config ? sample.config.baudRate + ' / ' + sample.config.dataBits + sample.config.parity + sample.config.stopBits : 'غير محدد';
+        return '<tr><td>' + esc(time) + '</td><td>' + esc(sample.port || '—') + '</td><td><span dir="ltr">' + esc(config) + '</span></td><td>' + esc(sample.protocol || 'غير معروف') + '</td><td>' + (sample.weight == null ? '—' : esc(fmt(sample.weight)) + ' كجم') + '</td><td title="' + esc(sample.raw || '') + '">' + esc(sample.preview || '') + '</td></tr>';
+      }).join('');
+    }
+    const last = deviceExplorerSamples[deviceExplorerSamples.length - 1];
+    if (last) {
+      $('explorerRawPreview').textContent = last.readable || 'وصلت بيانات غير قابلة للعرض النصي.';
+      $('explorerRawSize').textContent = (last.rawLength || 0) + ' حرف';
+    } else {
+      $('explorerRawPreview').textContent = 'لا توجد بيانات مستقبلة حتى الآن.';
+      $('explorerRawSize').textContent = '0 حرف';
+    }
+    renderDeviceExplorerProtocol();
+  }
+  function renderDeviceExplorerCaptureStatus() {
+    $('explorerCaptureStatus').textContent = deviceExplorerCaptureActive ? 'يسجل الآن' : 'متوقف';
+    $('explorerCaptureStatus').classList.toggle('is-active', deviceExplorerCaptureActive);
+    $('explorerCaptureHint').textContent = deviceExplorerCaptureActive ? 'تُحفظ البيانات الواردة' : 'لا يتم تسجيل بيانات حاليًا';
+    $('explorerCaptureStart').disabled = deviceExplorerCaptureActive;
+    $('explorerCaptureStop').disabled = !deviceExplorerCaptureActive;
+    if (deviceExplorerCaptureActive) {
+      $('explorerCaptureMessage').textContent = (serialPort || autoScanRunning)
+        ? 'التسجيل نشط. كل البيانات الواردة من محاولة الاتصال الحالية تُضاف إلى سجل التشخيص.'
+        : 'التسجيل في وضع الانتظار. اذهب إلى «الاتصال بالأجهزة» وشغّل البحث التلقائي أو الاتصال اليدوي لبدء استقبال العينات.';
+    }
+  }
+  function classifyExplorerProtocol(raw) {
+    const data = String(raw || '');
+    const stx = String.fromCharCode(0x02);
+    const etx = String.fromCharCode(0x03);
+    const extracted = extractYaohuaA9Frames(data);
+    for (const frame of extracted.frames) {
+      const value = parseYaohuaA9Frame(frame);
+      if (value !== null) {
+        return { name: 'YAOHUA XK3190-A9 / A9+', description: 'إطار ثنائي/نصي بطول 12 بايت مع STX وETX وفحص XOR؛ تم التحقق من إطار وزن مطابق.', confidence: 'مرتفع — توقيع إطار مطابق', weight: value };
+      }
+    }
+    if (data.includes(stx) && data.includes(etx)) {
+      const inner = data.slice(data.indexOf(stx) + 1, data.lastIndexOf(etx)).replace(/[\x00-\x1f]/g, ' ').trim();
+      const value = parseSerialWeight(inner);
+      return { name: 'إطار STX / ETX', description: value === null ? 'تم رصد علامات بداية ونهاية إطار، لكن لم يتم استخراج رقم وزن صالح.' : 'تم رصد إطار STX/ETX يحتوي على قيمة رقمية قابلة للقراءة. قد يكون تنسيقًا عامًا وليس اسم شركة محددًا.', confidence: value === null ? 'مبدئي — إطار غير مكتمل' : 'متوسط — تنسيق إطار معروف', weight: value };
+    }
+    const clean = data.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, ' ').trim();
+    const value = parseSerialWeight(clean);
+    if (value !== null && /[\r\n]/.test(data)) {
+      return { name: 'ASCII نصي — CR / LF', description: 'بيانات نصية تحتوي على رقم وزن وفواصل أسطر. هذا تنسيق شائع، ولا يحدد الشركة المصنعة للمؤشر.', confidence: 'متوسط — نمط نصي قابل للقراءة', weight: value };
+    }
+    if (value !== null) {
+      return { name: 'ASCII Continuous Stream', description: 'تدفق نصي مستمر يحتوي على قيمة رقمية. يلزم تجميع عدة عينات ومقارنة توقيت الرسائل للتأكد.', confidence: 'مبدئي — عينة رقمية واحدة', weight: value };
+    }
+    if (/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(data)) {
+      return { name: 'بيانات ثنائية / بروتوكول غير معروف', description: 'تم استقبال محارف تحكم أو بيانات غير نصية. تم حفظ العينة الخام للمراجعة، ولا يمكن تسمية البروتوكول بدقة من هذه العينة وحدها.', confidence: 'غير معروف', weight: null };
+    }
+    return { name: 'بروتوكول غير معروف', description: 'وصلت بيانات، لكن شكلها لا يطابق التنسيقات النصية والإطارات المعروفة حاليًا. تم حفظ العينة كما وردت.', confidence: 'غير معروف — يحتاج تحليل', weight: null };
+  }
+  function explorerReadableData(data) {
+    return String(data || '').replace(/\r/g, '\\r').replace(/\n/g, '\\n\n').replace(/\t/g, '\\t')
+      .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, ch => '\\x' + (ch.charCodeAt(0) & 255).toString(16).padStart(2, '0'));
+  }
+  function recordDeviceExplorerData(data) {
+    if (!deviceExplorerCaptureActive) return;
+    const raw = String(data ?? '');
+    if (!raw) return;
+    deviceExplorerRawBuffer = (deviceExplorerRawBuffer + raw).slice(-2048);
+    const detected = classifyExplorerProtocol(deviceExplorerRawBuffer);
+    const weight = detected.weight;
+    const config = deviceExplorerCurrentConfig || {
+      baudRate: Number($('serialBaud')?.value || 0),
+      dataBits: Number($('serialDataBits')?.value || 8),
+      parity: $('serialParity')?.value || 'none',
+      stopBits: Number($('serialStopBits')?.value || 1)
+    };
+    const portPath = deviceExplorerCurrentConfig?.path || serialPort?.path || $('serialDevice')?.value || 'COM غير محدد';
+    const preview = explorerReadableData(raw).slice(0, 220);
+    const sample = {
+      at: new Date().toISOString(),
+      port: portPath,
+      config: { baudRate: config.baudRate, dataBits: config.dataBits, parity: config.parity, stopBits: config.stopBits },
+      protocol: detected.name,
+      confidence: detected.confidence,
+      weight,
+      rawLength: raw.length,
+      raw: raw.slice(0, 1500),
+      readable: explorerReadableData(raw).slice(0, 1200),
+      preview
+    };
+    deviceExplorerSamples.push(sample);
+    if (deviceExplorerSamples.length > 2000) deviceExplorerSamples.splice(0, deviceExplorerSamples.length - 2000);
+    deviceExplorerLastProtocol = { ...detected, port: portPath };
+    deviceExplorerSaveCounter++;
+    if (deviceExplorerSaveCounter >= 5) {
+      deviceExplorerSaveCounter = 0;
+      saveDeviceExplorerState();
+    }
+    if ($('view-device-explorer')?.classList.contains('active')) renderDeviceExplorerSamples();
+  }
+  async function refreshDeviceExplorerPorts(showMessage = true) {
+    const status = $('explorerDeviceStatus');
+    if (!status) return;
+    status.textContent = 'جارٍ فحص المنافذ...';
+    try {
+      let ports = [];
+      if (desktop && window.desktopBridge?.listSerialPorts) {
+        ports = await window.desktopBridge.listSerialPorts();
+      } else if (navigator.serial?.getPorts) {
+        const browserPorts = await navigator.serial.getPorts();
+        ports = browserPorts.map((port, index) => {
+          const info = port.getInfo ? port.getInfo() : {};
+          return { path: 'منفذ متاح للمتصفح ' + (index + 1), vendorId: info.usbVendorId, productId: info.usbProductId, manufacturer: 'USB Serial (Web Serial)' };
+        });
+      } else {
+        deviceExplorerPorts = [];
+        status.textContent = 'اكتشاف المنافذ متاح في نسخة Windows';
+        $('explorerRuntimeStatus').textContent = 'نسخة الويب';
+        renderDeviceExplorerPorts();
+        $('explorerCaptureMessage').textContent = 'المتصفح لا يتيح قائمة المنافذ تلقائيًا. استخدم نسخة Windows لتشخيص أجهزة USB وCOM دون طلب صلاحيات منفصلة لكل جهاز.';
+        return;
+      }
+      deviceExplorerPorts = ports.map(port => ({
+        path: String(port.path || 'Serial'),
+        manufacturer: port.manufacturer || '',
+        vendorId: port.vendorId || '',
+        productId: port.productId || '',
+        serialNumber: port.serialNumber || '',
+        pnpId: port.pnpId || '',
+        locationId: port.locationId || '',
+        friendlyName: port.friendlyName || ''
+      }));
+      deviceExplorerScanAt = new Date().toISOString();
+      saveDeviceExplorerState();
+      $('explorerRuntimeStatus').textContent = desktop ? 'نسخة Windows Desktop' : 'Web Serial';
+      renderDeviceExplorerPorts();
+      if (showMessage) {
+        $('explorerCaptureMessage').textContent = deviceExplorerPorts.length
+          ? 'اكتمل الفحص. اختر منفذًا لمراجعة بياناته، ثم ابدأ تسجيل البيانات قبل تشغيل البحث التلقائي من صفحة الاتصال.'
+          : 'لم يظهر أي منفذ COM/Serial. هذا لا يمنع تشغيل البرنامج أو تسجيل الوزن يدويًا.';
+      }
+    } catch (error) {
+      status.textContent = 'تعذر فحص المنافذ';
+      $('explorerCaptureMessage').textContent = 'حدث خطأ أثناء فحص الأجهزة: ' + (error?.message || String(error));
+    }
+  }
+  function exportDeviceExplorerReport() {
+    const report = {
+      application: 'Weighbridge 120T',
+      generatedAt: new Date().toISOString(),
+      runtime: desktop ? 'Windows Desktop' : 'Web',
+      lastScanAt: deviceExplorerScanAt,
+      detectedPorts: deviceExplorerPorts,
+      lastProtocolDetection: deviceExplorerLastProtocol,
+      capturedSamples: deviceExplorerSamples,
+      note: 'USB vendor/chipset identity does not by itself prove the scale indicator protocol. Samples are the UTF-8 text delivered to the application serial listener.'
+    };
+    const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = 'weighbridge-device-diagnostic-' + new Date().toISOString().replace(/[:.]/g, '-') + '.json';
+    anchor.click();
+    URL.revokeObjectURL(url);
+    showToast('تم تجهيز تقرير تشخيص الأجهزة والبروتوكول');
+  }
+  function startDeviceExplorerCapture() {
+    deviceExplorerCaptureActive = true;
+    deviceExplorerRawBuffer = '';
+    renderDeviceExplorerCaptureStatus();
+    $('explorerCaptureMessage').textContent = serialPort || autoScanRunning
+      ? 'بدأ التسجيل من الاتصال الحالي. يتم حفظ العينات الواردة بالتتابع.'
+      : 'تم تفعيل وضع الانتظار. انتقل إلى «الاتصال بالأجهزة» وشغّل البحث التلقائي أو الاتصال اليدوي؛ المستكشف سيسجل كل عينة واردة دون تغيير منطق الاتصال.';
+  }
+  function stopDeviceExplorerCapture() {
+    deviceExplorerCaptureActive = false;
+    deviceExplorerSaveCounter = 0;
+    saveDeviceExplorerState();
+    renderDeviceExplorerCaptureStatus();
+    $('explorerCaptureMessage').textContent = 'تم إيقاف التسجيل وحفظ العينات المسجلة محليًا. يمكنك تصدير تقرير التشخيص لإرساله للمراجعة.';
+  }
+  function renderDeviceExplorer() {
+    renderDeviceExplorerPorts();
+    renderDeviceExplorerSamples();
+    renderDeviceExplorerCaptureStatus();
+  }
+
   function rowMarkup(r, detailed = false) {
     const movement = esc(r.movementType || '—');
     const cells = detailed
@@ -293,10 +611,11 @@
   function switchView(name) {
     document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active',v.id==='view-'+name));
     document.querySelectorAll('.nav-link').forEach(v=>v.classList.toggle('active',v.dataset.view===name));
-    const titles={dashboard:'لوحة التشغيل',weighings:'سجل عمليات الوزن',vehicles:'السيارات والعملاء',reports:'التقارير والإحصائيات',connections:'الاتصال بأجهزة الوزن',settings:'إعدادات النظام'};
+    const titles={dashboard:'لوحة التشغيل',weighings:'سجل عمليات الوزن',vehicles:'السيارات والعملاء',reports:'التقارير والإحصائيات',connections:'الاتصال بأجهزة الوزن','device-explorer':'مستكشف الأجهزة والبروتوكولات',settings:'إعدادات النظام'};
     $('pageTitle').textContent=titles[name]||'لوحة التشغيل';
     $('sidebar').classList.remove('open');
     if(name==='weighings')renderRecords();
+    if(name==='device-explorer')refreshDeviceExplorerPorts(false);
   }
   function parseSerialWeight(line) {
     const text = String(line || '').replace(/\u0000/g, '').trim();
@@ -470,6 +789,7 @@
           if (!autoDetectionEnabled || $('weightMode').value === 'manual') return;
           const config = configs[index];
           autoScanAttemptActive = true;
+          deviceExplorerCurrentConfig = { path: port.path, ...config };
           autoScanBuffer = '';
           autoScanReadings = [];
           autoScanDetected = null;
@@ -556,14 +876,15 @@
         autoDetectionEnabled = false;
         const selectedPath = $('serialDevice').value;
         if (!selectedPath) { showToast('اختر منفذ COM أولاً'); return; }
-        await window.desktopBridge.openSerialPort({
+        deviceExplorerCurrentConfig = {
           path: selectedPath,
           baudRate: Number($('serialBaud').value),
           dataBits: Number($('serialDataBits').value),
           stopBits: Number($('serialStopBits').value),
           parity: $('serialParity').value,
           flowControl: $('serialFlow').value
-        });
+        };
+        await window.desktopBridge.openSerialPort(deviceExplorerCurrentConfig);
         serialPort = { desktop: true, path: selectedPath };
         serialReading = true;
         desktopSerialBuffer = '';
@@ -1056,6 +1377,26 @@
     $('openExcelFile').disabled = true;
   }
   $('serialConnect').addEventListener('click',connectSerial);
+  $('explorerRefreshPorts').addEventListener('click', () => refreshDeviceExplorerPorts(true));
+  $('explorerExportReport').addEventListener('click', exportDeviceExplorerReport);
+  $('explorerCaptureStart').addEventListener('click', startDeviceExplorerCapture);
+  $('explorerCaptureStop').addEventListener('click', stopDeviceExplorerCapture);
+  $('explorerClearLog').addEventListener('click', () => {
+    if (!deviceExplorerSamples.length) { showToast('سجل العينات فارغ بالفعل'); return; }
+    deviceExplorerSamples = [];
+    deviceExplorerLastProtocol = null;
+    deviceExplorerRawBuffer = '';
+    deviceExplorerSaveCounter = 0;
+    saveDeviceExplorerState();
+    renderDeviceExplorerSamples();
+    showToast('تم مسح سجل عينات التشخيص');
+  });
+  $('explorerPortsTable').addEventListener('click', event => {
+    const button = event.target.closest('[data-explorer-port]');
+    if (!button) return;
+    deviceExplorerSelectedPath = button.dataset.explorerPort;
+    renderDeviceExplorerPorts();
+  });
   $('serialDisconnect').addEventListener('click',disconnectSerial);
 
     $('protocolProfile').addEventListener('change', () => {
@@ -1140,6 +1481,7 @@
     });
 
     window.desktopBridge.onSerialData(data => {
+      recordDeviceExplorerData(data);
       if (autoScanAttemptActive) consumeAutoScanData(data);
       else consumeDesktopSerialData(data);
     });
@@ -1227,5 +1569,6 @@
   $('saveSettings').addEventListener('click',()=>{settings.systemName=$('systemName').value.trim()||'Weighbridge 120T';writeJSON(SETTINGS_KEY,settings);document.title=settings.systemName+' | نظام إدارة البسكول';$('settingsMessage').textContent='تم حفظ الإعدادات.';showToast('تم حفظ الإعدادات');});
   $('clearData').addEventListener('click',deleteAllRecords);
   $('systemName').value=settings.systemName||'Weighbridge 120T';
+  renderDeviceExplorer();
   setWeight(liveWeight);setStability(true);updateCaptureUI();renderAll();
 })();
