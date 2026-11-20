@@ -72,6 +72,17 @@
     if (activeWeightSource === 'waiting') { $('formMessage').textContent = 'اختر الإدخال اليدوي أو وصّل الميزان وانتظر أول قراءة.'; return; }
     if (!isStable) { $('formMessage').textContent = 'لا يمكن تسجيل الوزن قبل استقرار القراءة.'; return; }
     if (liveWeight > CAPACITY) { $('formMessage').textContent = 'الوزن يتجاوز السعة القصوى.'; return; }
+    if (firstCapture && !secondCapture) {
+      if (activeWeightSource === 'manual' && !$('manualWeight').value.trim()) {
+        $('formMessage').textContent = 'اكتب قراءة الوزنة الثانية أولًا؛ الوزن يتحدث تلقائيًا.';
+        $('manualWeight').focus();
+        return;
+      }
+      if (activeWeightSource !== 'manual' && rawScaleWeight == null) {
+        $('formMessage').textContent = 'بانتظار قراءة جديدة من الميزان لتسجيل الوزنة الثانية.';
+        return;
+      }
+    }
     const plate = $('plateInput').value.trim();
     if (!plate) { $('formMessage').textContent = 'اكتب رقم السيارة أولًا.'; $('plateInput').focus(); return; }
     const originalWeight = rawScaleWeight == null ? null : Math.round(Number(rawScaleWeight) * 100) / 100;
@@ -89,7 +100,11 @@
     if (!firstCapture) {
       firstCapture = captureData;
       activeTicketDetails = ticketDetails;
-      $('formMessage').textContent = 'تم تسجيل الوزنة الأولى. سجّل الوزنة الثانية بعد تغيير قراءة الميزان.';
+      if (activeWeightSource !== 'manual') activeWeightSource = 'waiting';
+      setWeight(0);
+      $('manualWeight').value = '';
+      setStability(false);
+      $('formMessage').textContent = 'تم حفظ الوزنة الأولى وبيانات العملية. أدخل الوزن الجديد لتسجيل الوزنة الثانية.';
       updateCaptureUI();
       showToast('تم تسجيل الوزنة الأولى');
       return;
@@ -114,17 +129,41 @@
     $('formMessage').textContent = 'اكتملت العملية الحالية. اضغط «عملية جديدة» لبدء تذكرة أخرى.';
   }
   function updateCaptureUI() {
-    $('firstWeight').textContent = firstCapture ? fmt(firstCapture.weight) + ' كجم' : '—';
-    $('firstTime').textContent = firstCapture ? stamp(new Date(firstCapture.time)) : 'لم تسجل بعد';
-    $('secondWeight').textContent = secondCapture ? fmt(secondCapture.weight) + ' كجم' : '—';
-    $('secondTime').textContent = secondCapture ? stamp(new Date(secondCapture.time)) : 'لم تسجل بعد';
-    $('netWeight').textContent = firstCapture && secondCapture ? fmt(Math.abs(firstCapture.weight - secondCapture.weight)) + ' كجم' : '—';
-    $('weighStep').textContent = secondCapture ? 'اكتملت الوزنتان' : firstCapture ? 'الوزنة الثانية' : 'الوزنة الأولى';
-    $('captureWeight').textContent = secondCapture ? 'اكتملت العملية' : firstCapture ? 'تسجيل الوزنة الثانية' : 'تسجيل الوزنة الأولى';
-    $('captureWeight').disabled = Boolean(secondCapture);
+    const hasFirst = Boolean(firstCapture);
+    const hasSecond = Boolean(secondCapture);
+    $('firstWeight').textContent = hasFirst ? fmt(firstCapture.weight) + ' كجم' : '—';
+    $('firstTime').textContent = hasFirst ? stamp(new Date(firstCapture.time)) : 'لم تسجل بعد';
+    $('secondWeight').textContent = hasSecond ? fmt(secondCapture.weight) + ' كجم' : '—';
+    $('secondTime').textContent = hasSecond ? stamp(new Date(secondCapture.time)) : 'لم تسجل بعد';
+    $('netWeight').textContent = hasFirst && hasSecond ? fmt(Math.abs(firstCapture.weight - secondCapture.weight)) + ' كجم' : '—';
+    $('ticketDetailsFields').hidden = hasFirst;
+    $('ticketDetailsSummary').hidden = !hasFirst;
+    $('secondCaptureBox').hidden = !hasFirst;
+    $('captureArrow').hidden = !hasFirst;
+    $('netCaptureBox').hidden = !hasSecond;
+    if (hasFirst && activeTicketDetails) {
+      const details = [
+        ['العميل', activeTicketDetails.customer], ['السائق', activeTicketDetails.driver],
+        ['الشحنة', activeTicketDetails.shipment], ['المحافظة', activeTicketDetails.governorate],
+        ['الحركة', activeTicketDetails.movementType], ['السيارة', activeTicketDetails.plate],
+        ['المقطورة', activeTicketDetails.trailer]
+      ];
+      $('ticketDetailsSummary').innerHTML = details.map(([label,value]) =>
+        '<div class="ticket-summary-item"><small>'+esc(label)+'</small><strong>'+esc(value || '—')+'</strong></div>'
+      ).join('');
+    }
+    $('captureHelp').textContent = hasSecond
+      ? 'اكتملت الوزنتان وتم حفظ بيانات العملية.'
+      : hasFirst
+        ? 'تم تثبيت بيانات الشحنة والوزنة الأولى؛ سجّل الوزنة الثانية فقط.'
+        : 'أدخل بيانات العملية ثم سجّل الوزنة الأولى';
+    $('weighStep').textContent = hasSecond ? 'اكتملت الوزنتان' : hasFirst ? 'الوزنة الثانية' : 'الوزنة الأولى';
+    $('captureWeight').textContent = hasSecond ? 'اكتملت العملية' : hasFirst ? 'تسجيل الوزنة الثانية' : 'تسجيل الوزنة الأولى';
+    $('captureWeight').disabled = hasSecond;
   }
   function resetTicket() {
     firstCapture = null; secondCapture = null; activeTicketDetails = null;
+    $('manualWeight').value = '';
     $('formMessage').textContent = '';
     $('plateInput').value = '';
     $('trailerInput').value = '';
@@ -157,9 +196,10 @@
       ? '<td><strong>'+esc(r.id)+'</strong></td><td>'+movement+'</td><td>'+esc(r.plate)+'</td><td>'+esc(r.trailer || '—')+'</td>' +
         '<td>'+esc(r.driver)+'</td><td>'+esc(r.customer)+'</td><td>'+esc(r.shipment || '—')+'</td><td>'+esc(r.governorate || '—')+'</td>' +
         '<td>'+fmt(r.firstWeight)+'</td><td>'+fmt(r.secondWeight)+'</td><td><strong class="net-cell">'+fmt(r.netWeight)+'</strong></td><td>'+stamp(new Date(r.createdAt))+'</td>' +
-        '<td><div class="table-actions"><button class="table-action" data-ticket="'+esc(r.id)+'">التذكرة</button><button class="table-action delete-row-action" data-delete-record="'+esc(r.id)+'">حذف</button></div></td>'
+        '<td><div class="table-actions"><button class="table-action" data-ticket="'+esc(r.id)+'">التذكرة</button><button class="table-action" data-export-ticket="'+esc(r.id)+'">تصدير Excel</button><button class="table-action delete-row-action" data-delete-record="'+esc(r.id)+'">حذف</button></div></td>'
       : '<td><strong>'+esc(r.id)+'</strong></td><td>'+movement+'</td><td>'+esc(r.plate)+'</td><td>'+esc(r.trailer || '—')+'</td>' +
-        '<td>'+esc(r.customer)+'</td><td>'+esc(r.driver)+'</td><td>'+esc(r.shipment || '—')+'</td><td><strong class="net-cell">'+fmt(r.netWeight)+'</strong></td><td>'+stamp(new Date(r.createdAt))+'</td>';
+        '<td>'+esc(r.customer)+'</td><td>'+esc(r.driver)+'</td><td>'+esc(r.shipment || '—')+'</td><td><strong class="net-cell">'+fmt(r.netWeight)+'</strong></td><td>'+stamp(new Date(r.createdAt))+'</td>' +
+        '<td><button class="table-action" data-export-ticket="'+esc(r.id)+'">تصدير ملف Excel</button></td>';
     return '<tr>'+cells+'</tr>';
   }
   function searchRecords(query) {
@@ -216,7 +256,7 @@
     $('lastWeighing').textContent = records.length ? stamp(new Date(records[0].createdAt)) : '—';
     updateConnectionCard();
     $('sidebarDeviceStatus').textContent = serialPort ? (serialPort.auto ? 'تم التعرف على الميزان تلقائيًا' : 'الميزان متصل') : 'بانتظار توصيل الميزان';
-    $('recentTable').innerHTML = records.length ? records.slice(0,5).map(r=>rowMarkup(r)).join('') : '<tr class="empty-row"><td colspan="7">لا توجد عمليات مسجلة حتى الآن</td></tr>';
+    $('recentTable').innerHTML = records.length ? records.slice(0,5).map(r=>rowMarkup(r)).join('') : '<tr class="empty-row"><td colspan="10">لا توجد عمليات مسجلة حتى الآن</td></tr>';
     renderRecords();
     renderVehicles();
     renderReports();
@@ -641,6 +681,48 @@
     renderAll();
     showToast('تم قطع الاتصال بالميزان');
   }
+  function excelRowForRecord(r) {
+    const original1 = Object.prototype.hasOwnProperty.call(r, 'firstOriginalWeight') ? r.firstOriginalWeight : r.firstWeight;
+    const original2 = Object.prototype.hasOwnProperty.call(r, 'secondOriginalWeight') ? r.secondOriginalWeight : r.secondWeight;
+    return {
+      'رقم التذكرة': r.id, 'نوع الحركة': r.movementType || '—', 'رقم السيارة': r.plate, 'رقم المقطورة': r.trailer || '—',
+      'السائق': r.driver, 'العميل': r.customer, 'اسم الشحنة': r.shipment || '—', 'المحافظة': r.governorate || '—',
+      'قراءة الأولى الأصلية (كجم)': original1 == null ? 'إدخال يدوي' : original1,
+      'الوزن الأول المعتمد (كجم)': r.firstWeight,
+      'فرق تعديل الأولى (كجم)': original1 == null ? '' : Number((r.firstWeight - original1).toFixed(2)),
+      'قراءة الثانية الأصلية (كجم)': original2 == null ? 'إدخال يدوي' : original2,
+      'الوزن الثاني المعتمد (كجم)': r.secondWeight,
+      'فرق تعديل الثانية (كجم)': original2 == null ? '' : Number((r.secondWeight - original2).toFixed(2)),
+      'صافي الحمولة (كجم)': r.netWeight, 'مصدر الأولى': r.firstSource || r.source,
+      'مصدر الثانية': r.secondSource || r.source,
+      'وقت الوزنة الأولى': r.firstTime || '', 'وقت الوزنة الثانية': r.secondTime || '',
+      'تاريخ العملية': stamp(new Date(r.createdAt))
+    };
+  }
+
+  async function exportTicketExcel(id) {
+    const record = records.find(r => r.id === id);
+    if (!record) { showToast('لم يتم العثور على المعاملة المطلوبة'); return; }
+    if (desktop && window.desktopBridge?.exportExcel) {
+      try {
+        const result = await window.desktopBridge.exportExcel([record], {
+          fileName: 'Weighbridge-Ticket-' + record.id + '.xlsx',
+          openAfterExport: true
+        });
+        if (!result.canceled) showToast('تم تصدير وفتح ملف Excel للتذكرة ' + record.id);
+      } catch (error) { showToast('تعذر تصدير ملف Excel: ' + error.message); }
+      return;
+    }
+    if (!window.XLSX) { showToast('مكتبة Excel لم تُحمّل؛ تعذر تصدير التذكرة.'); return; }
+    const row = excelRowForRecord(record);
+    const sheet = XLSX.utils.json_to_sheet([row]);
+    sheet['!cols'] = Object.keys(row).map(() => ({ wch: 23 }));
+    const book = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(book, sheet, 'بيانات التذكرة');
+    XLSX.writeFile(book, 'Weighbridge-Ticket-' + record.id + '.xlsx');
+    showToast('تم تنزيل ملف Excel للتذكرة ' + record.id);
+  }
+
   async function exportExcel() {
     if (!records.length) { showToast('لا توجد عمليات لتصديرها'); return; }
     if (desktop && window.desktopBridge?.exportExcel) {
@@ -651,24 +733,7 @@
       return;
     }
     if (!window.XLSX) { showToast('مكتبة Excel لم تُحمّل. تحقق من اتصال الإنترنت.'); return; }
-    const rows = records.slice().reverse().map(r => {
-      const original1 = Object.prototype.hasOwnProperty.call(r, 'firstOriginalWeight') ? r.firstOriginalWeight : r.firstWeight;
-      const original2 = Object.prototype.hasOwnProperty.call(r, 'secondOriginalWeight') ? r.secondOriginalWeight : r.secondWeight;
-      return {
-        'رقم التذكرة': r.id, 'نوع الحركة': r.movementType || '—', 'رقم السيارة': r.plate, 'رقم المقطورة': r.trailer || '—',
-        'السائق': r.driver, 'العميل': r.customer, 'اسم الشحنة': r.shipment || '—', 'المحافظة': r.governorate || '—',
-        'قراءة الأولى الأصلية (كجم)': original1 == null ? 'إدخال يدوي' : original1,
-        'الوزن الأول المعتمد (كجم)': r.firstWeight,
-        'فرق تعديل الأولى (كجم)': original1 == null ? '' : Number((r.firstWeight - original1).toFixed(2)),
-        'قراءة الثانية الأصلية (كجم)': original2 == null ? 'إدخال يدوي' : original2,
-        'الوزن الثاني المعتمد (كجم)': r.secondWeight,
-        'فرق تعديل الثانية (كجم)': original2 == null ? '' : Number((r.secondWeight - original2).toFixed(2)),
-        'صافي الحمولة (كجم)': r.netWeight, 'مصدر الأولى': r.firstSource || r.source,
-        'مصدر الثانية': r.secondSource || r.source,
-        'وقت الوزنة الأولى': r.firstTime || '', 'وقت الوزنة الثانية': r.secondTime || '',
-        'تاريخ العملية': stamp(new Date(r.createdAt))
-      };
-    });
+    const rows = records.slice().reverse().map(excelRowForRecord);
     const sheet = XLSX.utils.json_to_sheet(rows);
     sheet['!cols'] = Object.keys(rows[0]).map(() => ({ wch: 23 }));
     const book = XLSX.utils.book_new();
@@ -690,26 +755,35 @@
   document.querySelectorAll('[data-view]').forEach(b=>b.addEventListener('click',()=>switchView(b.dataset.view)));
   document.querySelectorAll('[data-go]').forEach(b=>b.addEventListener('click',()=>switchView(b.dataset.go)));
   $('mobileMenu').addEventListener('click',()=>$('sidebar').classList.toggle('open'));
-  $('applyManualWeight').addEventListener('click',()=>{
-    const raw = $('manualWeight').value;
-    const value = Number(raw);
-    if (raw === '' || !Number.isFinite(value) || value < 0 || value > CAPACITY) {
-      showToast('أدخل وزنًا صحيحًا من 0 إلى 500,000 كجم'); return;
-    }
+  $('manualWeight').addEventListener('input',()=>{
     $('weightMode').value = 'manual';
     activeWeightSource = 'manual';
     rawScaleWeight = null;
+    const raw = $('manualWeight').value;
+    if (raw === '') {
+      setWeight(0);
+      setStability(false);
+      $('formMessage').textContent = firstCapture ? 'أدخل قراءة الوزنة الثانية.' : 'أدخل الوزن بالكيلوجرام.';
+      return;
+    }
+    const value = Number(raw);
+    if (!Number.isFinite(value) || value < 0 || value > CAPACITY) {
+      setStability(false);
+      $('formMessage').textContent = 'أدخل وزنًا صحيحًا من 0 إلى 500,000 كجم.';
+      return;
+    }
     setWeight(value);
     setStability(true);
-    $('formMessage').textContent = 'تم اعتماد الوزن يدويًا.';
-    showToast('تم اعتماد الوزن اليدوي');
+    $('formMessage').textContent = firstCapture
+      ? 'قراءة الوزنة الثانية تتحدث تلقائيًا. اضغط تسجيل الوزنة الثانية عند استقرار الوزن.'
+      : 'قراءة الوزن تتحدث تلقائيًا. اضغط تسجيل الوزنة الأولى عند استقرار الوزن.';
   });
   $('weightMode').addEventListener('change',()=>{
     if ($('weightMode').value === 'manual') {
       activeWeightSource = 'manual';
       rawScaleWeight = null;
-      $('formMessage').textContent = 'وضع الإدخال اليدوي مفعل. قراءة الكابل لن تغيّر الوزن الحالي.';
-      $('manualWeight').value = liveWeight;
+      $('formMessage').textContent = 'وضع الإدخال اليدوي مفعل. اكتب الوزن وسيتم تحديث القراءة تلقائيًا.';
+      $('manualWeight').value = firstCapture && !secondCapture ? '' : liveWeight;
     } else {
       activeWeightSource = 'waiting';
       rawScaleWeight = null;
@@ -940,6 +1014,8 @@
     const deleteButton = e.target.closest('[data-delete-record]');
     if (deleteButton) { deleteRecord(deleteButton.dataset.deleteRecord); return; }
     if (e.target.closest('[data-delete-all-records]')) { deleteAllRecords(); return; }
+    const exportButton = e.target.closest('[data-export-ticket]');
+    if (exportButton) { exportTicketExcel(exportButton.dataset.exportTicket); return; }
     const ticketButton = e.target.closest('[data-ticket]');
     if (ticketButton) { const r=records.find(x=>x.id===ticketButton.dataset.ticket); if(r)openTicket(r); }
   });
