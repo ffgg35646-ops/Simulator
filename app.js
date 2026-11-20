@@ -431,7 +431,7 @@
       deviceExplorerSaveCounter = 0;
       saveDeviceExplorerState();
     }
-    if ($('view-device-explorer')?.classList.contains('active')) renderDeviceExplorerSamples();
+    if ($('view-devices')?.classList.contains('active')) renderDeviceExplorerSamples();
   }
   async function refreshDeviceExplorerPorts(showMessage = true) {
     const status = $('explorerDeviceStatus');
@@ -625,11 +625,11 @@
   function switchView(name) {
     document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active',v.id==='view-'+name));
     document.querySelectorAll('.nav-link').forEach(v=>v.classList.toggle('active',v.dataset.view===name));
-    const titles={dashboard:'لوحة التشغيل',weighings:'سجل عمليات الوزن',vehicles:'السيارات والعملاء',reports:'التقارير والإحصائيات',connections:'الاتصال بأجهزة الوزن','device-explorer':'مستكشف الأجهزة والبروتوكولات',settings:'إعدادات النظام'};
+    const titles={dashboard:'لوحة التشغيل',weighings:'سجل عمليات الوزن',vehicles:'السيارات والعملاء',reports:'التقارير والإحصائيات',devices:'الأجهزة والاتصال'};
     $('pageTitle').textContent=titles[name]||'لوحة التشغيل';
     $('sidebar').classList.remove('open');
     if(name==='weighings')renderRecords();
-    if(name==='device-explorer')refreshDeviceExplorerPorts(false);
+    if(name==='devices')refreshDeviceExplorerPorts(false);
   }
   function parseSerialWeight(line) {
     const text = String(line || '').replace(/\u0000/g, '').trim();
