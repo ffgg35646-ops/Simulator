@@ -700,6 +700,201 @@
     };
   }
 
+  function excelColumnName(index) {
+    let name = '';
+    let value = index + 1;
+    while (value > 0) {
+      const remainder = (value - 1) % 26;
+      name = String.fromCharCode(65 + remainder) + name;
+      value = Math.floor((value - 1) / 26);
+    }
+    return name;
+  }
+
+  function escapeExcelXml(value) {
+    return String(value ?? '')
+      .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&apos;');
+  }
+
+  function joinExcelBytes(chunks) {
+    const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+    const result = new Uint8Array(totalLength);
+    let offset = 0;
+    for (const chunk of chunks) {
+      result.set(chunk, offset);
+      offset += chunk.length;
+    }
+    return result;
+  }
+
+  function crc32Excel(bytes) {
+    let crc = 0xFFFFFFFF;
+    for (let i = 0; i < bytes.length; i++) {
+      crc ^= bytes[i];
+      for (let bit = 0; bit < 8; bit++) {
+        crc = (crc >>> 1) ^ ((crc & 1) ? 0xEDB88320 : 0);
+      }
+    }
+    return (crc ^ 0xFFFFFFFF) >>> 0;
+  }
+
+  function zipExcelFiles(files) {
+    const encoder = new TextEncoder();
+    const localParts = [];
+    const centralParts = [];
+    let localOffset = 0;
+    const dosDate = 0x0021;
+
+    for (const file of files) {
+      const name = encoder.encode(file.name);
+      const data = encoder.encode(file.content);
+      const checksum = crc32Excel(data);
+
+      const localHeader = new Uint8Array(30);
+      const localView = new DataView(localHeader.buffer);
+      localView.setUint32(0, 0x04034B50, true);
+      localView.setUint16(4, 20, true);
+      localView.setUint16(6, 0x0800, true);
+      localView.setUint16(8, 0, true);
+      localView.setUint16(10, 0, true);
+      localView.setUint16(12, dosDate, true);
+      localView.setUint32(14, checksum, true);
+      localView.setUint32(18, data.length, true);
+      localView.setUint32(22, data.length, true);
+      localView.setUint16(26, name.length, true);
+      localView.setUint16(28, 0, true);
+      const localPart = joinExcelBytes([localHeader, name, data]);
+      localParts.push(localPart);
+
+      const centralHeader = new Uint8Array(46);
+      const centralView = new DataView(centralHeader.buffer);
+      centralView.setUint32(0, 0x02014B50, true);
+      centralView.setUint16(4, 20, true);
+      centralView.setUint16(6, 20, true);
+      centralView.setUint16(8, 0x0800, true);
+      centralView.setUint16(10, 0, true);
+      centralView.setUint16(12, 0, true);
+      centralView.setUint16(14, dosDate, true);
+      centralView.setUint32(16, checksum, true);
+      centralView.setUint32(20, data.length, true);
+      centralView.setUint32(24, data.length, true);
+      centralView.setUint16(28, name.length, true);
+      centralView.setUint16(30, 0, true);
+      centralView.setUint16(32, 0, true);
+      centralView.setUint16(34, 0, true);
+      centralView.setUint16(36, 0, true);
+      centralView.setUint32(38, 0, true);
+      centralView.setUint32(42, localOffset, true);
+      centralParts.push(joinExcelBytes([centralHeader, name]));
+
+      localOffset += localPart.length;
+    }
+
+    const centralDirectory = joinExcelBytes(centralParts);
+    const endRecord = new Uint8Array(22);
+    const endView = new DataView(endRecord.buffer);
+    endView.setUint32(0, 0x06054B50, true);
+    endView.setUint16(4, 0, true);
+    endView.setUint16(6, 0, true);
+    endView.setUint16(8, files.length, true);
+    endView.setUint16(10, files.length, true);
+    endView.setUint32(12, centralDirectory.length, true);
+    endView.setUint32(16, localOffset, true);
+    endView.setUint16(20, 0, true);
+
+    return joinExcelBytes([...localParts, centralDirectory, endRecord]);
+  }
+
+  function buildExcelWorkbookBlob(rows, requestedSheetName) {
+    const safeRows = Array.isArray(rows) ? rows : [];
+    const headers = Object.keys(safeRows[0] || {});
+    const table = [headers, ...safeRows.map(row => headers.map(header => row[header]))];
+    const lastColumn = excelColumnName(Math.max(0, headers.length - 1));
+    const sheetRows = table.map((cells, rowIndex) => {
+      const rowNumber = rowIndex + 1;
+      const cellXml = cells.map((value, columnIndex) => {
+        const reference = excelColumnName(columnIndex) + rowNumber;
+        if (value == null || value === '') return '<c r="' + reference + '"/>';
+        if (typeof value === 'number' && Number.isFinite(value)) {
+          return '<c r="' + reference + '"><v>' + String(value) + '</v></c>';
+        }
+        return '<c r="' + reference + '" t="inlineStr"><is><t xml:space="preserve">' +
+          escapeExcelXml(value) + '</t></is></c>';
+      }).join('');
+      return '<row r="' + rowNumber + '">' + cellXml + '</row>';
+    }).join('');
+    const columns = headers.map((_, index) => {
+      const column = index + 1;
+      return '<col min="' + column + '" max="' + column + '" width="23" customWidth="1"/>';
+    }).join('');
+    const sheetName = escapeExcelXml(String(requestedSheetName || 'Sheet1').slice(0, 31));
+
+    const files = [
+      {
+        name: '[Content_Types].xml',
+        content: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+          '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
+          '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
+          '<Default Extension="xml" ContentType="application/xml"/>' +
+          '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' +
+          '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>' +
+          '</Types>'
+      },
+      {
+        name: '_rels/.rels',
+        content: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+          '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+          '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>' +
+          '</Relationships>'
+      },
+      {
+        name: 'xl/workbook.xml',
+        content: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+          '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" ' +
+          'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' +
+          '<sheets><sheet name="' + sheetName + '" sheetId="1" r:id="rId1"/></sheets></workbook>'
+      },
+      {
+        name: 'xl/_rels/workbook.xml.rels',
+        content: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+          '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+          '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>' +
+          '</Relationships>'
+      },
+      {
+        name: 'xl/worksheets/sheet1.xml',
+        content: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+          '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
+          '<dimension ref="A1:' + lastColumn + table.length + '"/>' +
+          '<sheetViews><sheetView workbookViewId="0"/></sheetViews>' +
+          '<sheetFormatPr defaultRowHeight="18"/><cols>' + columns + '</cols>' +
+          '<sheetData>' + sheetRows + '</sheetData>' +
+          '<autoFilter ref="A1:' + lastColumn + table.length + '"/>' +
+          '</worksheet>'
+      }
+    ];
+    const bytes = zipExcelFiles(files);
+    return new Blob([bytes], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    });
+  }
+
+  function downloadExcelBlob(blob, fileName) {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+  }
+
   async function exportTicketExcel(id) {
     const record = records.find(r => r.id === id);
     if (!record) { showToast('لم يتم العثور على المعاملة المطلوبة'); return; }
@@ -713,7 +908,13 @@
       } catch (error) { showToast('تعذر تصدير ملف Excel: ' + error.message); }
       return;
     }
-    if (!window.XLSX) { showToast('مكتبة Excel لم تُحمّل؛ تعذر تصدير التذكرة.'); return; }
+    if (!window.XLSX) {
+      const row = excelRowForRecord(record);
+      const blob = buildExcelWorkbookBlob([row], 'بيانات التذكرة');
+      downloadExcelBlob(blob, 'Weighbridge-Ticket-' + record.id + '.xlsx');
+      showToast('تم تنزيل ملف Excel للتذكرة ' + record.id);
+      return;
+    }
     const row = excelRowForRecord(record);
     const sheet = XLSX.utils.json_to_sheet([row]);
     sheet['!cols'] = Object.keys(row).map(() => ({ wch: 23 }));
@@ -732,7 +933,13 @@
       } catch (error) { showToast('تعذر تصدير Excel: ' + error.message); }
       return;
     }
-    if (!window.XLSX) { showToast('مكتبة Excel لم تُحمّل. تحقق من اتصال الإنترنت.'); return; }
+    if (!window.XLSX) {
+      const rows = records.slice().reverse().map(excelRowForRecord);
+      const blob = buildExcelWorkbookBlob(rows, 'سجل الوزن');
+      downloadExcelBlob(blob, 'Weighbridge-120T-Records-' + dateKey(now()) + '.xlsx');
+      showToast('تم تنزيل ملف Excel بنجاح');
+      return;
+    }
     const rows = records.slice().reverse().map(excelRowForRecord);
     const sheet = XLSX.utils.json_to_sheet(rows);
     sheet['!cols'] = Object.keys(rows[0]).map(() => ({ wch: 23 }));
