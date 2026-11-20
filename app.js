@@ -349,24 +349,32 @@
         : 'التسجيل في وضع الانتظار. اذهب إلى «الاتصال بالأجهزة» وشغّل البحث التلقائي أو الاتصال اليدوي لبدء استقبال العينات.';
     }
   }
-  function classifyExplorerProtocol(raw) {
+  function classifyExplorerProtocol(raw, latestChunk = raw) {
     const data = String(raw || '');
+    const current = String(latestChunk || '');
     const stx = String.fromCharCode(0x02);
     const etx = String.fromCharCode(0x03);
     const extracted = extractYaohuaA9Frames(data);
     for (const frame of extracted.frames) {
       const value = parseYaohuaA9Frame(frame);
       if (value !== null) {
-        return { name: 'YAOHUA XK3190-A9 / A9+', description: 'إطار ثنائي/نصي بطول 12 بايت مع STX وETX وفحص XOR؛ تم التحقق من إطار وزن مطابق.', confidence: 'مرتفع — توقيع إطار مطابق', weight: value };
+        return { name: 'YAOHUA XK3190-A9 / A9+', description: 'إطار بطول 12 بايت مع STX وETX وفحص XOR؛ تم التحقق من إطار وزن مطابق.', confidence: 'مرتفع — توقيع إطار مطابق', weight: value };
       }
     }
     if (data.includes(stx) && data.includes(etx)) {
-      const inner = data.slice(data.indexOf(stx) + 1, data.lastIndexOf(etx)).replace(/[\x00-\x1f]/g, ' ').trim();
+      const frames = data.split(etx).filter(frame => frame.includes(stx));
+      const latestFrame = frames[frames.length - 1] || data;
+      const inner = latestFrame.slice(latestFrame.indexOf(stx) + 1).replace(/[\x00-\x1f]/g, ' ').trim();
       const value = parseSerialWeight(inner);
-      return { name: 'إطار STX / ETX', description: value === null ? 'تم رصد علامات بداية ونهاية إطار، لكن لم يتم استخراج رقم وزن صالح.' : 'تم رصد إطار STX/ETX يحتوي على قيمة رقمية قابلة للقراءة. قد يكون تنسيقًا عامًا وليس اسم شركة محددًا.', confidence: value === null ? 'مبدئي — إطار غير مكتمل' : 'متوسط — تنسيق إطار معروف', weight: value };
+      return { name: 'إطار STX / ETX', description: value === null ? 'تم رصد علامات بداية ونهاية إطار، لكن لم يتم استخراج رقم وزن صالح.' : 'تم رصد إطار STX/ETX يحتوي على قيمة رقمية قابلة للقراءة. هذا وصف للتنسيق وليس اسم شركة محددًا.', confidence: value === null ? 'مبدئي — إطار غير مكتمل' : 'متوسط — تنسيق إطار معروف', weight: value };
     }
-    const clean = data.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, ' ').trim();
-    const value = parseSerialWeight(clean);
+    const completeLines = data.split(/[\r\n]+/).map(line => line.trim()).filter(Boolean);
+    let value = null;
+    for (let index = completeLines.length - 1; index >= 0 && value === null; index--) {
+      value = parseSerialWeight(completeLines[index]);
+    }
+    const currentClean = current.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, ' ').trim();
+    if (value === null && !/[\r\n]/.test(data)) value = parseSerialWeight(currentClean);
     if (value !== null && /[\r\n]/.test(data)) {
       return { name: 'ASCII نصي — CR / LF', description: 'بيانات نصية تحتوي على رقم وزن وفواصل أسطر. هذا تنسيق شائع، ولا يحدد الشركة المصنعة للمؤشر.', confidence: 'متوسط — نمط نصي قابل للقراءة', weight: value };
     }
@@ -387,7 +395,7 @@
     const raw = String(data ?? '');
     if (!raw) return;
     deviceExplorerRawBuffer = (deviceExplorerRawBuffer + raw).slice(-2048);
-    const detected = classifyExplorerProtocol(deviceExplorerRawBuffer);
+    const detected = classifyExplorerProtocol(deviceExplorerRawBuffer, raw);
     const weight = detected.weight;
     const config = deviceExplorerCurrentConfig || {
       baudRate: Number($('serialBaud')?.value || 0),
