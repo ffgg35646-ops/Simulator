@@ -11,6 +11,7 @@
   let activeWeightSource = "waiting";
   let firstCapture = null;
   let secondCapture = null;
+  let activeTicketDetails = null;
   let activeRecord = null;
   let toastTimer = null;
   let serialPort = null;
@@ -75,9 +76,19 @@
     if (!plate) { $('formMessage').textContent = 'اكتب رقم السيارة أولًا.'; $('plateInput').focus(); return; }
     const originalWeight = rawScaleWeight == null ? null : Math.round(Number(rawScaleWeight) * 100) / 100;
     const captureData = { weight: liveWeight, originalWeight, adjusted: originalWeight != null && Math.abs(originalWeight - liveWeight) > 0.005, time: now().toISOString(), source: activeWeightSource };
+    const ticketDetails = {
+      plate,
+      trailer: $('trailerInput').value.trim() || '—',
+      driver: $('driverInput').value.trim() || '—',
+      customer: $('customerInput').value.trim() || '—',
+      shipment: $('shipmentInput').value.trim() || '—',
+      governorate: $('governorateInput').value || '—',
+      movementType: $('movementTypeInput').value || 'وارد'
+    };
     rawScaleWeight = null;
     if (!firstCapture) {
       firstCapture = captureData;
+      activeTicketDetails = ticketDetails;
       $('formMessage').textContent = 'تم تسجيل الوزنة الأولى. سجّل الوزنة الثانية بعد تغيير قراءة الميزان.';
       updateCaptureUI();
       showToast('تم تسجيل الوزنة الأولى');
@@ -87,8 +98,7 @@
       secondCapture = captureData;
       const net = Math.abs(firstCapture.weight - secondCapture.weight);
       const record = {
-        id: ticketNo(), plate, driver: $('driverInput').value.trim() || '—',
-        customer: $('customerInput').value.trim() || '—',
+        id: ticketNo(), ...(activeTicketDetails || ticketDetails),
         firstWeight: firstCapture.weight, secondWeight: secondCapture.weight,
         firstOriginalWeight: firstCapture.originalWeight, secondOriginalWeight: secondCapture.originalWeight,
         firstAdjusted: firstCapture.adjusted, secondAdjusted: secondCapture.adjusted,
@@ -114,9 +124,15 @@
     $('captureWeight').disabled = Boolean(secondCapture);
   }
   function resetTicket() {
-    firstCapture = null; secondCapture = null;
+    firstCapture = null; secondCapture = null; activeTicketDetails = null;
     $('formMessage').textContent = '';
-    $('plateInput').value = ''; $('driverInput').value = ''; $('customerInput').value = '';
+    $('plateInput').value = '';
+    $('trailerInput').value = '';
+    $('driverInput').value = '';
+    $('customerInput').value = '';
+    $('shipmentInput').value = '';
+    $('governorateInput').value = '';
+    $('movementTypeInput').value = 'وارد';
     updateCaptureUI(); $('plateInput').focus();
   }
   function openTicket(record) {
@@ -126,17 +142,24 @@
   }
   function ticketMarkup(r) {
     return '<div class="ticket-paper"><div class="ticket-brand"><h2>WEIGHBRIDGE 120T</h2><p>تذكرة وزن شاحنة · Truck Weighing Ticket</p></div><div class="ticket-number">رقم التذكرة: ' + esc(r.id) + '</div><div class="ticket-grid">' +
-      ticketField('رقم السيارة',r.plate) + ticketField('السائق',r.driver) + ticketField('العميل',r.customer) +
-      ticketField('تاريخ العملية',stamp(new Date(r.createdAt))) + ticketField('الوزنة الأولى',fmt(r.firstWeight)+' كجم') + ticketField('الوزنة الثانية',fmt(r.secondWeight)+' كجم') +
+      ticketField('نوع الحركة',r.movementType || '—') + ticketField('اسم العميل',r.customer) +
+      ticketField('اسم السائق',r.driver) + ticketField('اسم الشحنة',r.shipment || '—') +
+      ticketField('المحافظة',r.governorate || '—') + ticketField('رقم السيارة',r.plate) +
+      ticketField('رقم المقطورة',r.trailer || '—') + ticketField('تاريخ العملية',stamp(new Date(r.createdAt))) +
+      ticketField('الوزنة الأولى',fmt(r.firstWeight)+' كجم') + ticketField('الوزنة الثانية',fmt(r.secondWeight)+' كجم') +
       '</div><div class="ticket-net"><small>صافي الحمولة</small><strong>' + fmt(r.netWeight) + ' كجم</strong></div><div class="ticket-footer">مصدر القراءة: ' + esc(r.source || 'غير محدد') + ' · راجع معايرة الميزان قبل الاستخدام التجاري أو القانوني</div></div>';
   }
   function ticketField(label, value) { return '<div class="ticket-field"><small>'+esc(label)+'</small><strong>'+esc(String(value))+'</strong></div>'; }
   function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
   function rowMarkup(r, detailed = false) {
-    const cells = '<td><strong>'+esc(r.id)+'</strong></td><td>'+esc(r.plate)+'</td>' +
-      (detailed ? '<td>'+esc(r.driver)+'</td>' : '') +
-      '<td>'+esc(r.customer)+'</td><td>'+fmt(r.firstWeight)+'</td><td>'+fmt(r.secondWeight)+'</td><td><strong class="net-cell">'+fmt(r.netWeight)+'</strong></td><td>'+stamp(new Date(r.createdAt))+'</td>' +
-      (detailed ? '<td><div class="table-actions"><button class="table-action" data-ticket="'+esc(r.id)+'">التذكرة</button><button class="table-action delete-row-action" data-delete-record="'+esc(r.id)+'">حذف</button></div></td>' : '');
+    const movement = esc(r.movementType || '—');
+    const cells = detailed
+      ? '<td><strong>'+esc(r.id)+'</strong></td><td>'+movement+'</td><td>'+esc(r.plate)+'</td><td>'+esc(r.trailer || '—')+'</td>' +
+        '<td>'+esc(r.driver)+'</td><td>'+esc(r.customer)+'</td><td>'+esc(r.shipment || '—')+'</td><td>'+esc(r.governorate || '—')+'</td>' +
+        '<td>'+fmt(r.firstWeight)+'</td><td>'+fmt(r.secondWeight)+'</td><td><strong class="net-cell">'+fmt(r.netWeight)+'</strong></td><td>'+stamp(new Date(r.createdAt))+'</td>' +
+        '<td><div class="table-actions"><button class="table-action" data-ticket="'+esc(r.id)+'">التذكرة</button><button class="table-action delete-row-action" data-delete-record="'+esc(r.id)+'">حذف</button></div></td>'
+      : '<td><strong>'+esc(r.id)+'</strong></td><td>'+movement+'</td><td>'+esc(r.plate)+'</td><td>'+esc(r.trailer || '—')+'</td>' +
+        '<td>'+esc(r.customer)+'</td><td>'+esc(r.driver)+'</td><td>'+esc(r.shipment || '—')+'</td><td><strong class="net-cell">'+fmt(r.netWeight)+'</strong></td><td>'+stamp(new Date(r.createdAt))+'</td>';
     return '<tr>'+cells+'</tr>';
   }
   function searchRecords(query) {
@@ -144,7 +167,7 @@
     if (!q) return records.slice();
     return records.filter(r => {
       const values = [
-        r.id, r.plate, r.driver, r.customer, r.source, r.firstSource, r.secondSource,
+        r.id, r.movementType, r.plate, r.trailer, r.driver, r.customer, r.shipment, r.governorate, r.source, r.firstSource, r.secondSource,
         r.firstWeight, r.secondWeight, r.netWeight, r.firstOriginalWeight, r.secondOriginalWeight,
         r.createdAt, r.firstTime, r.secondTime,
         r.createdAt ? stamp(new Date(r.createdAt)) : '',
@@ -632,7 +655,8 @@
       const original1 = Object.prototype.hasOwnProperty.call(r, 'firstOriginalWeight') ? r.firstOriginalWeight : r.firstWeight;
       const original2 = Object.prototype.hasOwnProperty.call(r, 'secondOriginalWeight') ? r.secondOriginalWeight : r.secondWeight;
       return {
-        'رقم التذكرة': r.id, 'رقم السيارة': r.plate, 'السائق': r.driver, 'العميل': r.customer,
+        'رقم التذكرة': r.id, 'نوع الحركة': r.movementType || '—', 'رقم السيارة': r.plate, 'رقم المقطورة': r.trailer || '—',
+        'السائق': r.driver, 'العميل': r.customer, 'اسم الشحنة': r.shipment || '—', 'المحافظة': r.governorate || '—',
         'قراءة الأولى الأصلية (كجم)': original1 == null ? 'إدخال يدوي' : original1,
         'الوزن الأول المعتمد (كجم)': r.firstWeight,
         'فرق تعديل الأولى (كجم)': original1 == null ? '' : Number((r.firstWeight - original1).toFixed(2)),
@@ -655,8 +679,8 @@
 
   function exportCSV() {
     if(!records.length){showToast('لا توجد عمليات لتصديرها');return;}
-    const header=['رقم التذكرة','السيارة','السائق','العميل','الوزنة الأولى كجم','الوزنة الثانية كجم','الصافي كجم','التاريخ'];
-    const lines=[header,...records.map(r=>[r.id,r.plate,r.driver,r.customer,r.firstWeight,r.secondWeight,r.netWeight,stamp(new Date(r.createdAt))])];
+    const header=['رقم التذكرة','نوع الحركة','رقم السيارة','رقم المقطورة','اسم العميل','اسم السائق','اسم الشحنة','المحافظة','الوزنة الأولى كجم','الوزنة الثانية كجم','الوزن الصافي كجم','التاريخ'];
+    const lines=[header,...records.map(r=>[r.id,r.movementType || '—',r.plate,r.trailer || '—',r.customer,r.driver,r.shipment || '—',r.governorate || '—',r.firstWeight,r.secondWeight,r.netWeight,stamp(new Date(r.createdAt))])];
     const csv='\uFEFF'+lines.map(row=>row.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\r\n');
     const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
     const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='weighbridge-records.csv';a.click();URL.revokeObjectURL(url);
