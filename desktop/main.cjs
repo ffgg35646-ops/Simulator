@@ -72,13 +72,16 @@ function getStoredRecords() {
 
 function makeExcelWorkbook(records) {
   const headers = [
-    'رقم التذكرة', 'رقم السيارة', 'السائق', 'العميل',
+    'رقم التذكرة', 'نوع الحركة', 'رقم السيارة', 'رقم المقطورة', 'اسم السائق', 'اسم العميل', 'اسم الشحنة', 'المحافظة',
     'قراءة الميزان الأصلية الأولى (كجم)', 'الوزن المعتمد الأول (كجم)', 'فرق تعديل الأولى (كجم)',
     'قراءة الميزان الأصلية الثانية (كجم)', 'الوزن المعتمد الثاني (كجم)', 'فرق تعديل الثانية (كجم)',
     'صافي الحمولة المعتمد (كجم)', 'مصدر الوزنة الأولى', 'مصدر الوزنة الثانية',
     'وقت الوزنة الأولى', 'وقت الوزنة الثانية', 'تاريخ إنشاء التذكرة'
   ];
-  const detailHeaders = ['رقم التذكرة', 'رقم السيارة', 'الوزنة', 'القراءة الأصلية (كجم)', 'الوزن المعتمد (كجم)', 'فرق التعديل (كجم)', 'مصدر الوزن', 'وقت التسجيل'];
+  const detailHeaders = [
+    'رقم التذكرة', 'نوع الحركة', 'رقم السيارة', 'رقم المقطورة', 'اسم السائق', 'اسم العميل', 'اسم الشحنة', 'المحافظة',
+    'الوزنة', 'القراءة الأصلية (كجم)', 'الوزن المعتمد (كجم)', 'فرق التعديل (كجم)', 'مصدر الوزن', 'وقت التسجيل'
+  ];
   const valueOf = (record, originalKey, approvedKey) => {
     if (Object.prototype.hasOwnProperty.call(record, originalKey)) return record[originalKey];
     return record[approvedKey] ?? null;
@@ -90,7 +93,7 @@ function makeExcelWorkbook(records) {
     const firstRaw = original1(r);
     const secondRaw = original2(r);
     return [
-      r.id || '', r.plate || '', r.driver || '', r.customer || '',
+      r.id || '', r.movementType || '—', r.plate || '', r.trailer || '—', r.driver || '', r.customer || '', r.shipment || '—', r.governorate || '—',
       firstRaw == null ? 'إدخال يدوي' : firstRaw, r.firstWeight ?? '', adjustment(firstRaw, r.firstWeight),
       secondRaw == null ? 'إدخال يدوي' : secondRaw, r.secondWeight ?? '', adjustment(secondRaw, r.secondWeight),
       r.netWeight ?? '', r.firstSource || r.source || '', r.secondSource || r.source || '',
@@ -104,19 +107,19 @@ function makeExcelWorkbook(records) {
       { label: 'الثانية', raw: original2(r), approved: r.secondWeight, source: r.secondSource || r.source, time: r.secondTime }
     ]) {
       detailRows.push([
-        r.id || '', r.plate || '', item.label,
-        item.raw == null ? 'إدخال يدوي' : item.raw,
+        r.id || '', r.movementType || '—', r.plate || '', r.trailer || '—', r.driver || '', r.customer || '', r.shipment || '—', r.governorate || '—',
+        item.label, item.raw == null ? 'إدخال يدوي' : item.raw,
         item.approved ?? '', adjustment(item.raw, item.approved),
         item.source || '', item.time || ''
       ]);
     }
   }
   const tickets = XLSX.utils.aoa_to_sheet([headers, ...ticketRows]);
-  tickets['!cols'] = [22,18,20,24,25,22,20,25,22,20,23,24,24,24,24,24].map(wch => ({ wch }));
-  tickets['!autofilter'] = { ref: `A1:P${Math.max(1, ticketRows.length + 1)}` };
+  tickets['!cols'] = [22,14,18,18,20,24,22,18,25,22,20,25,22,20,23,24,24,24,24,24].map(wch => ({ wch }));
+  tickets['!autofilter'] = { ref: `A1:T${Math.max(1, ticketRows.length + 1)}` };
   const details = XLSX.utils.aoa_to_sheet([detailHeaders, ...detailRows]);
-  details['!cols'] = [22,18,14,23,22,20,24,24].map(wch => ({ wch }));
-  details['!autofilter'] = { ref: `A1:H${Math.max(1, detailRows.length + 1)}` };
+  details['!cols'] = [22,14,18,18,20,24,22,18,14,23,22,20,24,24].map(wch => ({ wch }));
+  details['!autofilter'] = { ref: `A1:N${Math.max(1, detailRows.length + 1)}` };
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, tickets, 'سجل الوزن');
   XLSX.utils.book_append_sheet(workbook, details, 'تفاصيل الوزنتين');
