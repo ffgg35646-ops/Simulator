@@ -7,7 +7,7 @@ contextBridge.exposeInMainWorld('desktopBridge', {
   getExcelStatus: () => ipcRenderer.invoke('excel:status'),
   chooseExcelFile: () => ipcRenderer.invoke('excel:choose-file'),
   openExcelFile: () => ipcRenderer.invoke('excel:open-file'),
-  exportExcel: records => ipcRenderer.invoke('excel:export', records),
+  exportExcel: (records, options) => ipcRenderer.invoke('excel:export', records, options),
   onExcelSyncStatus: callback => { const listener = (_event, status) => callback(status); ipcRenderer.on('excel:sync-status', listener); return () => ipcRenderer.removeListener('excel:sync-status', listener); },
   listSerialPorts: () => ipcRenderer.invoke('serial:list'),
   openSerialPort: config => ipcRenderer.invoke('serial:open', config),
