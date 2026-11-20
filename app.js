@@ -72,16 +72,16 @@
     if (activeWeightSource === 'waiting') { $('formMessage').textContent = 'اختر الإدخال اليدوي أو وصّل الميزان وانتظر أول قراءة.'; return; }
     if (!isStable) { $('formMessage').textContent = 'لا يمكن تسجيل الوزن قبل استقرار القراءة.'; return; }
     if (liveWeight > CAPACITY) { $('formMessage').textContent = 'الوزن يتجاوز السعة القصوى.'; return; }
-    if (firstCapture && !secondCapture) {
-      if (activeWeightSource === 'manual' && !$('manualWeight').value.trim()) {
-        $('formMessage').textContent = 'اكتب قراءة الوزنة الثانية أولًا؛ الوزن يتحدث تلقائيًا.';
-        $('manualWeight').focus();
-        return;
-      }
-      if (activeWeightSource !== 'manual' && rawScaleWeight == null) {
-        $('formMessage').textContent = 'بانتظار قراءة جديدة من الميزان لتسجيل الوزنة الثانية.';
-        return;
-      }
+    if (activeWeightSource === 'manual' && !$('manualWeight').value.trim()) {
+      $('formMessage').textContent = firstCapture
+        ? 'اكتب قراءة الوزنة الثانية أولًا؛ الوزن يتحدث تلقائيًا.'
+        : 'اكتب الوزن أولًا؛ القراءة تتحدث تلقائيًا.';
+      $('manualWeight').focus();
+      return;
+    }
+    if (activeWeightSource !== 'manual' && rawScaleWeight == null) {
+      $('formMessage').textContent = 'بانتظار قراءة جديدة من الميزان قبل تسجيل الوزن.';
+      return;
     }
     const plate = $('plateInput').value.trim();
     if (!plate) { $('formMessage').textContent = 'اكتب رقم السيارة أولًا.'; $('plateInput').focus(); return; }
@@ -783,7 +783,7 @@
       activeWeightSource = 'manual';
       rawScaleWeight = null;
       $('formMessage').textContent = 'وضع الإدخال اليدوي مفعل. اكتب الوزن وسيتم تحديث القراءة تلقائيًا.';
-      $('manualWeight').value = firstCapture && !secondCapture ? '' : liveWeight;
+      $('manualWeight').value = firstCapture && !secondCapture ? '' : liveWeight > 0 ? liveWeight : '';
     } else {
       activeWeightSource = 'waiting';
       rawScaleWeight = null;
