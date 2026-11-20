@@ -73,9 +73,7 @@
     if (!isStable) { $('formMessage').textContent = 'لا يمكن تسجيل الوزن قبل استقرار القراءة.'; return; }
     if (liveWeight > CAPACITY) { $('formMessage').textContent = 'الوزن يتجاوز السعة القصوى.'; return; }
     if (activeWeightSource === 'manual' && !$('manualWeight').value.trim()) {
-      $('formMessage').textContent = firstCapture
-        ? 'اكتب قراءة الوزنة الثانية أولًا؛ الوزن يتحدث تلقائيًا.'
-        : 'اكتب الوزن أولًا؛ القراءة تتحدث تلقائيًا.';
+      $('formMessage').textContent = '';
       $('manualWeight').focus();
       return;
     }
@@ -153,7 +151,7 @@
       ).join('');
     }
     $('captureHelp').textContent = hasSecond
-      ? 'اكتملت الوزنتان وتم حفظ بيانات العملية.'
+      ? ''
       : hasFirst
         ? 'تم تثبيت بيانات الشحنة والوزنة الأولى؛ سجّل الوزنة الثانية فقط.'
         : 'أدخل بيانات العملية ثم سجّل الوزنة الأولى';
@@ -970,7 +968,7 @@
     if (raw === '') {
       setWeight(0);
       setStability(false);
-      $('formMessage').textContent = firstCapture ? 'أدخل قراءة الوزنة الثانية.' : 'أدخل الوزن بالكيلوجرام.';
+      $('formMessage').textContent = '';
       return;
     }
     const value = Number(raw);
