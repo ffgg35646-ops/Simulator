@@ -11,6 +11,7 @@
   let activeWeightSource = "waiting";
   let firstCapture = null;
   let secondCapture = null;
+  let activeTicketDetails = null;
   let activeRecord = null;
   let toastTimer = null;
   let serialPort = null;
@@ -27,6 +28,17 @@
   let lastPortsSignature = null;
 
   const desktop = window.desktopBridge && window.desktopBridge.isDesktop;
+  const DEVICE_EXPLORER_KEY = 'weighbridge120t.deviceExplorer.v1';
+  const savedDeviceExplorer = readJSON(DEVICE_EXPLORER_KEY, {});
+  let deviceExplorerPorts = Array.isArray(savedDeviceExplorer.ports) ? savedDeviceExplorer.ports : [];
+  let deviceExplorerSamples = Array.isArray(savedDeviceExplorer.samples) ? savedDeviceExplorer.samples : [];
+  let deviceExplorerScanAt = savedDeviceExplorer.scanAt || '';
+  let deviceExplorerSelectedPath = '';
+  let deviceExplorerCaptureActive = false;
+  let deviceExplorerRawBuffer = '';
+  let deviceExplorerLastProtocol = savedDeviceExplorer.lastProtocol || null;
+  let deviceExplorerCurrentConfig = null;
+  let deviceExplorerSaveCounter = 0;
   function readJSON(key, fallback) {
     try {
       const stored = desktop ? window.desktopBridge.getItem(key) : localStorage.getItem(key);
@@ -71,14 +83,37 @@
     if (activeWeightSource === 'waiting') { $('formMessage').textContent = 'اختر الإدخال اليدوي أو وصّل الميزان وانتظر أول قراءة.'; return; }
     if (!isStable) { $('formMessage').textContent = 'لا يمكن تسجيل الوزن قبل استقرار القراءة.'; return; }
     if (liveWeight > CAPACITY) { $('formMessage').textContent = 'الوزن يتجاوز السعة القصوى.'; return; }
+    if (activeWeightSource === 'manual' && !$('manualWeight').value.trim()) {
+      $('formMessage').textContent = '';
+      $('manualWeight').focus();
+      return;
+    }
+    if (activeWeightSource !== 'manual' && rawScaleWeight == null) {
+      $('formMessage').textContent = 'بانتظار قراءة جديدة من الميزان قبل تسجيل الوزن.';
+      return;
+    }
     const plate = $('plateInput').value.trim();
     if (!plate) { $('formMessage').textContent = 'اكتب رقم السيارة أولًا.'; $('plateInput').focus(); return; }
     const originalWeight = rawScaleWeight == null ? null : Math.round(Number(rawScaleWeight) * 100) / 100;
     const captureData = { weight: liveWeight, originalWeight, adjusted: originalWeight != null && Math.abs(originalWeight - liveWeight) > 0.005, time: now().toISOString(), source: activeWeightSource };
+    const ticketDetails = {
+      plate,
+      trailer: $('trailerInput').value.trim() || '—',
+      driver: $('driverInput').value.trim() || '—',
+      customer: $('customerInput').value.trim() || '—',
+      shipment: $('shipmentInput').value.trim() || '—',
+      governorate: $('governorateInput').value || '—',
+      movementType: $('movementTypeInput').value || 'وارد'
+    };
     rawScaleWeight = null;
     if (!firstCapture) {
       firstCapture = captureData;
-      $('formMessage').textContent = 'تم تسجيل الوزنة الأولى. سجّل الوزنة الثانية بعد تغيير قراءة الميزان.';
+      activeTicketDetails = ticketDetails;
+      if (activeWeightSource !== 'manual') activeWeightSource = 'waiting';
+      setWeight(0);
+      $('manualWeight').value = '';
+      setStability(false);
+      $('formMessage').textContent = 'تم حفظ الوزنة الأولى وبيانات العملية. أدخل الوزن الجديد لتسجيل الوزنة الثانية.';
       updateCaptureUI();
       showToast('تم تسجيل الوزنة الأولى');
       return;
@@ -87,8 +122,7 @@
       secondCapture = captureData;
       const net = Math.abs(firstCapture.weight - secondCapture.weight);
       const record = {
-        id: ticketNo(), plate, driver: $('driverInput').value.trim() || '—',
-        customer: $('customerInput').value.trim() || '—',
+        id: ticketNo(), ...(activeTicketDetails || ticketDetails),
         firstWeight: firstCapture.weight, secondWeight: secondCapture.weight,
         firstOriginalWeight: firstCapture.originalWeight, secondOriginalWeight: secondCapture.originalWeight,
         firstAdjusted: firstCapture.adjusted, secondAdjusted: secondCapture.adjusted,
@@ -104,19 +138,49 @@
     $('formMessage').textContent = 'اكتملت العملية الحالية. اضغط «عملية جديدة» لبدء تذكرة أخرى.';
   }
   function updateCaptureUI() {
-    $('firstWeight').textContent = firstCapture ? fmt(firstCapture.weight) + ' كجم' : '—';
-    $('firstTime').textContent = firstCapture ? stamp(new Date(firstCapture.time)) : 'لم تسجل بعد';
-    $('secondWeight').textContent = secondCapture ? fmt(secondCapture.weight) + ' كجم' : '—';
-    $('secondTime').textContent = secondCapture ? stamp(new Date(secondCapture.time)) : 'لم تسجل بعد';
-    $('netWeight').textContent = firstCapture && secondCapture ? fmt(Math.abs(firstCapture.weight - secondCapture.weight)) + ' كجم' : '—';
-    $('weighStep').textContent = secondCapture ? 'اكتملت الوزنتان' : firstCapture ? 'الوزنة الثانية' : 'الوزنة الأولى';
-    $('captureWeight').textContent = secondCapture ? 'اكتملت العملية' : firstCapture ? 'تسجيل الوزنة الثانية' : 'تسجيل الوزنة الأولى';
-    $('captureWeight').disabled = Boolean(secondCapture);
+    const hasFirst = Boolean(firstCapture);
+    const hasSecond = Boolean(secondCapture);
+    $('firstWeight').textContent = hasFirst ? fmt(firstCapture.weight) + ' كجم' : '—';
+    $('firstTime').textContent = hasFirst ? stamp(new Date(firstCapture.time)) : 'لم تسجل بعد';
+    $('secondWeight').textContent = hasSecond ? fmt(secondCapture.weight) + ' كجم' : '—';
+    $('secondTime').textContent = hasSecond ? stamp(new Date(secondCapture.time)) : 'لم تسجل بعد';
+    $('netWeight').textContent = hasFirst && hasSecond ? fmt(Math.abs(firstCapture.weight - secondCapture.weight)) + ' كجم' : '—';
+    $('ticketDetailsFields').hidden = hasFirst;
+    $('ticketDetailsSummary').hidden = !hasFirst;
+    $('secondCaptureBox').hidden = !hasFirst;
+    $('captureArrow').hidden = !hasFirst;
+    $('netCaptureBox').hidden = !hasSecond;
+    if (hasFirst && activeTicketDetails) {
+      const details = [
+        ['العميل', activeTicketDetails.customer], ['السائق', activeTicketDetails.driver],
+        ['الشحنة', activeTicketDetails.shipment], ['المحافظة', activeTicketDetails.governorate],
+        ['الحركة', activeTicketDetails.movementType], ['السيارة', activeTicketDetails.plate],
+        ['المقطورة', activeTicketDetails.trailer]
+      ];
+      $('ticketDetailsSummary').innerHTML = details.map(([label,value]) =>
+        '<div class="ticket-summary-item"><small>'+esc(label)+'</small><strong>'+esc(value || '—')+'</strong></div>'
+      ).join('');
+    }
+    $('captureHelp').textContent = hasSecond
+      ? ''
+      : hasFirst
+        ? 'تم تثبيت بيانات الشحنة والوزنة الأولى؛ سجّل الوزنة الثانية فقط.'
+        : 'أدخل بيانات العملية ثم سجّل الوزنة الأولى';
+    $('weighStep').textContent = hasSecond ? 'اكتملت الوزنتان' : hasFirst ? 'الوزنة الثانية' : 'الوزنة الأولى';
+    $('captureWeight').textContent = hasSecond ? 'اكتملت العملية' : hasFirst ? 'تسجيل الوزنة الثانية' : 'تسجيل الوزنة الأولى';
+    $('captureWeight').disabled = hasSecond;
   }
   function resetTicket() {
-    firstCapture = null; secondCapture = null;
+    firstCapture = null; secondCapture = null; activeTicketDetails = null;
+    $('manualWeight').value = '';
     $('formMessage').textContent = '';
-    $('plateInput').value = ''; $('driverInput').value = ''; $('customerInput').value = '';
+    $('plateInput').value = '';
+    $('trailerInput').value = '';
+    $('driverInput').value = '';
+    $('customerInput').value = '';
+    $('shipmentInput').value = '';
+    $('governorateInput').value = '';
+    $('movementTypeInput').value = 'وارد';
     updateCaptureUI(); $('plateInput').focus();
   }
   function openTicket(record) {
@@ -126,17 +190,346 @@
   }
   function ticketMarkup(r) {
     return '<div class="ticket-paper"><div class="ticket-brand"><h2>WEIGHBRIDGE 120T</h2><p>تذكرة وزن شاحنة · Truck Weighing Ticket</p></div><div class="ticket-number">رقم التذكرة: ' + esc(r.id) + '</div><div class="ticket-grid">' +
-      ticketField('رقم السيارة',r.plate) + ticketField('السائق',r.driver) + ticketField('العميل',r.customer) +
-      ticketField('تاريخ العملية',stamp(new Date(r.createdAt))) + ticketField('الوزنة الأولى',fmt(r.firstWeight)+' كجم') + ticketField('الوزنة الثانية',fmt(r.secondWeight)+' كجم') +
+      ticketField('اسم العميل',r.customer) + ticketField('اسم السائق',r.driver) +
+      ticketField('رقم السيارة',r.plate) + ticketField('رقم المقطورة',r.trailer || '—') +
+      ticketField('المحافظة',r.governorate || '—') + ticketField('نوع الحركة',r.movementType || '—') +
+      ticketField('اسم الشحنة',r.shipment || '—') + ticketField('تاريخ العملية',stamp(new Date(r.createdAt))) +
+      ticketField('الوزنة الأولى',fmt(r.firstWeight)+' كجم') + ticketField('الوزنة الثانية',fmt(r.secondWeight)+' كجم') +
       '</div><div class="ticket-net"><small>صافي الحمولة</small><strong>' + fmt(r.netWeight) + ' كجم</strong></div></div>';
   }
   function ticketField(label, value) { return '<div class="ticket-field"><small>'+esc(label)+'</small><strong>'+esc(String(value))+'</strong></div>'; }
   function esc(s) { return String(s ?? '').replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+  const explorerUsbVendors = {
+    '1a86': 'QinHeng / CH340-CH341',
+    '0403': 'FTDI',
+    '067b': 'Prolific PL2303',
+    '10c4': 'Silicon Labs CP210x',
+    '2341': 'Arduino USB Serial',
+    '2e8a': 'Raspberry Pi / RP2040',
+    '1b4f': 'SparkFun USB Serial'
+  };
+  function explorerHexId(value) {
+    if (value === undefined || value === null || value === '') return '—';
+    const clean = typeof value === 'number' && Number.isFinite(value)
+      ? Math.trunc(value).toString(16)
+      : String(value).replace(/^0x/i, '').toLowerCase();
+    return clean ? clean.padStart(4, '0') : '—';
+  }
+  function explorerPortVendor(port) {
+    const vendorId = explorerHexId(port.vendorId);
+    return explorerUsbVendors[vendorId] || port.manufacturer || (port.pnpId ? 'جهاز USB غير محدد' : 'منفذ تسلسلي');
+  }
+  function explorerPortType(port) {
+    const vendorId = explorerHexId(port.vendorId);
+    if (explorerUsbVendors[vendorId]) return 'USB-Serial';
+    if (port.vendorId || port.productId || /USB/i.test(String(port.pnpId || ''))) return 'USB غير معروف';
+    return 'Serial';
+  }
+  function saveDeviceExplorerState() {
+    try {
+      writeJSON(DEVICE_EXPLORER_KEY, {
+        ports: deviceExplorerPorts,
+        samples: deviceExplorerSamples,
+        scanAt: deviceExplorerScanAt,
+        lastProtocol: deviceExplorerLastProtocol
+      });
+    } catch (error) {
+      const message = $('explorerCaptureMessage');
+      if (message) message.textContent = 'تعذر حفظ سجل التشخيص محليًا: ' + (error?.message || String(error));
+    }
+  }
+  function renderDeviceExplorerPorts() {
+    const body = $('explorerPortsTable');
+    if (!body) return;
+    $('explorerPortCount').textContent = String(deviceExplorerPorts.length);
+    $('explorerUsbCount').textContent = String(deviceExplorerPorts.filter(port => explorerPortType(port) === 'USB-Serial').length);
+    $('explorerDeviceStatus').textContent = deviceExplorerPorts.length ? 'تم اكتشاف ' + deviceExplorerPorts.length + ' منفذ' : 'لا توجد منافذ';
+    $('explorerLastScan').textContent = deviceExplorerScanAt
+      ? 'آخر فحص: ' + stamp(new Date(deviceExplorerScanAt))
+      : 'لم يتم إجراء فحص بعد.';
+    if (!deviceExplorerPorts.some(port => port.path === deviceExplorerSelectedPath)) {
+      deviceExplorerSelectedPath = deviceExplorerPorts[0]?.path || '';
+    }
+    if (!deviceExplorerPorts.length) {
+      body.innerHTML = '<tr class="empty-row"><td colspan="6">لم يتم العثور على منفذ متاح. افحص الكابل وتعريف المحول ثم أعد الفحص.</td></tr>';
+      renderDeviceExplorerSelected();
+      return;
+    }
+    body.innerHTML = deviceExplorerPorts.map(port => {
+      const path = String(port.path || 'Serial');
+      const vendor = explorerPortVendor(port);
+      const vid = explorerHexId(port.vendorId);
+      const pid = explorerHexId(port.productId);
+      const isSelected = path === deviceExplorerSelectedPath;
+      const connected = Boolean(serialPort && serialPort.path === path && !serialPort.autoPending);
+      const kind = explorerPortType(port);
+      return '<tr class="' + (isSelected ? 'explorer-selected-row' : '') + '">' +
+        '<td><button class="table-action explorer-select-port" type="button" data-explorer-port="' + esc(path) + '">' + esc(path) + '</button>' +
+        (connected ? '<span class="explorer-subtext">اتصال الميزان الحالي</span>' : '') + '</td>' +
+        '<td><span class="explorer-vendor">' + esc(vendor) + '</span><span class="explorer-subtext">' + esc(port.friendlyName || port.pnpId || 'لا يوجد وصف إضافي من نظام التشغيل') + '</span></td>' +
+        '<td><span dir="ltr">' + esc(vid) + ' : ' + esc(pid) + '</span></td>' +
+        '<td>' + esc(port.serialNumber || 'غير متاح') + '</td>' +
+        '<td><span class="explorer-type-tag ' + (kind === 'USB-Serial' ? '' : 'unknown') + '">' + esc(kind) + '</span></td>' +
+        '<td><button class="table-action" type="button" data-explorer-port="' + esc(path) + '">عرض</button></td>' +
+        '</tr>';
+    }).join('');
+    renderDeviceExplorerSelected();
+  }
+  function renderDeviceExplorerSelected() {
+    const host = $('explorerSelectedDevice');
+    if (!host) return;
+    const port = deviceExplorerPorts.find(item => item.path === deviceExplorerSelectedPath);
+    if (!port) {
+      host.innerHTML = '<div class="explorer-empty-state"><div class="explorer-empty-icon">⌁</div><strong>لم يتم اختيار جهاز</strong><span>نفّذ الفحص ثم اختر أحد المنافذ من الجدول.</span></div>';
+      $('explorerSelectedBadge').textContent = 'لا يوجد تحديد';
+      return;
+    }
+    const connected = Boolean(serialPort && serialPort.path === port.path && !serialPort.autoPending);
+    $('explorerSelectedBadge').textContent = connected ? 'متصل حاليًا' : 'منفذ مكتشف';
+    host.innerHTML = [
+      ['المنفذ', port.path || 'غير معروف'],
+      ['الشركة / الشريحة', explorerPortVendor(port)],
+      ['معرّف VID', explorerHexId(port.vendorId)],
+      ['معرّف PID', explorerHexId(port.productId)],
+      ['الرقم التسلسلي', port.serialNumber || 'غير متاح'],
+      ['معرّف PnP', port.pnpId || 'غير متاح'],
+      ['موقع الجهاز', port.locationId || 'غير متاح'],
+      ['الحالة', connected ? 'اتصال مستخدم حاليًا' : 'مكتشف — ليس بالضرورة متصلًا بالمؤشر']
+    ].map(item => '<div><small>' + esc(item[0]) + '</small><strong>' + esc(String(item[1])) + '</strong></div>').join('');
+  }
+  function renderDeviceExplorerProtocol() {
+    const info = deviceExplorerLastProtocol;
+    if (!info) {
+      $('explorerProtocolName').textContent = 'لم يتم التعرف عليه بعد';
+      $('explorerProtocolDescription').textContent = 'يلزم استقبال بيانات فعلية من مؤشر الميزان قبل تحديد تنسيق الرسائل.';
+      $('explorerProtocolBadge').textContent = 'لم تصل بيانات';
+      $('explorerProtocolConfidence').textContent = '—';
+      $('explorerProtocolWeight').textContent = '—';
+      $('explorerProtocolPort').textContent = '—';
+      return;
+    }
+    $('explorerProtocolName').textContent = info.name;
+    $('explorerProtocolDescription').textContent = info.description;
+    $('explorerProtocolBadge').textContent = info.confidence;
+    $('explorerProtocolConfidence').textContent = info.confidence;
+    $('explorerProtocolWeight').textContent = info.weight == null ? 'لا توجد قراءة' : fmt(info.weight) + ' كجم';
+    $('explorerProtocolPort').textContent = info.port || 'غير معروف';
+  }
+  function renderDeviceExplorerSamples() {
+    $('explorerSampleCount').textContent = String(deviceExplorerSamples.length);
+    const body = $('explorerSamplesTable');
+    if (!body) return;
+    if (!deviceExplorerSamples.length) {
+      body.innerHTML = '<tr class="empty-row"><td colspan="6">لم يتم تسجيل عينات بعد.</td></tr>';
+    } else {
+      body.innerHTML = deviceExplorerSamples.slice(-35).reverse().map(sample => {
+        const time = sample.at ? stamp(new Date(sample.at)) : '—';
+        const config = sample.config ? sample.config.baudRate + ' / ' + sample.config.dataBits + sample.config.parity + sample.config.stopBits : 'غير محدد';
+        return '<tr><td>' + esc(time) + '</td><td>' + esc(sample.port || '—') + '</td><td><span dir="ltr">' + esc(config) + '</span></td><td>' + esc(sample.protocol || 'غير معروف') + '</td><td>' + (sample.weight == null ? '—' : esc(fmt(sample.weight)) + ' كجم') + '</td><td title="' + esc(sample.raw || '') + '">' + esc(sample.preview || '') + '</td></tr>';
+      }).join('');
+    }
+    const last = deviceExplorerSamples[deviceExplorerSamples.length - 1];
+    if (last) {
+      const hexPreview = last.hex ? last.hex.match(/.{1,2}/g).slice(0, 160).join(' ') : 'غير متاح';
+      $('explorerRawPreview').textContent = (last.readable || 'وصلت بيانات غير قابلة للعرض النصي.') + '\\nHEX: ' + hexPreview;
+      $('explorerRawSize').textContent = (last.rawLength || 0) + ' بايت';
+    } else {
+      $('explorerRawPreview').textContent = 'لا توجد بيانات مستقبلة حتى الآن.';
+      $('explorerRawSize').textContent = '0 حرف';
+    }
+    renderDeviceExplorerProtocol();
+  }
+  function renderDeviceExplorerCaptureStatus() {
+    $('explorerCaptureStatus').textContent = deviceExplorerCaptureActive ? 'يسجل الآن' : 'متوقف';
+    $('explorerCaptureStatus').classList.toggle('is-active', deviceExplorerCaptureActive);
+    $('explorerCaptureHint').textContent = deviceExplorerCaptureActive ? 'تُحفظ البيانات الواردة' : 'لا يتم تسجيل بيانات حاليًا';
+    $('explorerCaptureStart').disabled = deviceExplorerCaptureActive;
+    $('explorerCaptureStop').disabled = !deviceExplorerCaptureActive;
+    if (deviceExplorerCaptureActive) {
+      $('explorerCaptureMessage').textContent = (serialPort || autoScanRunning)
+        ? 'التسجيل نشط. كل البيانات الواردة من محاولة الاتصال الحالية تُضاف إلى سجل التشخيص.'
+        : 'التسجيل في وضع الانتظار. اذهب إلى «الاتصال بالأجهزة» وشغّل البحث التلقائي أو الاتصال اليدوي لبدء استقبال العينات.';
+    }
+  }
+  function classifyExplorerProtocol(raw, latestChunk = raw) {
+    const data = String(raw || '');
+    const current = String(latestChunk || '');
+    const stx = String.fromCharCode(0x02);
+    const etx = String.fromCharCode(0x03);
+    const extracted = extractYaohuaA9Frames(data);
+    for (const frame of extracted.frames) {
+      const value = parseYaohuaA9Frame(frame);
+      if (value !== null) {
+        return { name: 'YAOHUA XK3190-A9 / A9+', description: 'إطار بطول 12 بايت مع STX وETX وفحص XOR؛ تم التحقق من إطار وزن مطابق.', confidence: 'مرتفع — توقيع إطار مطابق', weight: value };
+      }
+    }
+    if (data.includes(stx) && data.includes(etx)) {
+      const frames = data.split(etx).filter(frame => frame.includes(stx));
+      const latestFrame = frames[frames.length - 1] || data;
+      const inner = latestFrame.slice(latestFrame.indexOf(stx) + 1).replace(/[\x00-\x1f]/g, ' ').trim();
+      const value = parseSerialWeight(inner);
+      return { name: 'إطار STX / ETX', description: value === null ? 'تم رصد علامات بداية ونهاية إطار، لكن لم يتم استخراج رقم وزن صالح.' : 'تم رصد إطار STX/ETX يحتوي على قيمة رقمية قابلة للقراءة. هذا وصف للتنسيق وليس اسم شركة محددًا.', confidence: value === null ? 'مبدئي — إطار غير مكتمل' : 'متوسط — تنسيق إطار معروف', weight: value };
+    }
+    const completeLines = data.split(/[\r\n]+/).map(line => line.trim()).filter(Boolean);
+    let value = null;
+    for (let index = completeLines.length - 1; index >= 0 && value === null; index--) {
+      value = parseSerialWeight(completeLines[index]);
+    }
+    const currentClean = current.replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, ' ').trim();
+    if (value === null && !/[\r\n]/.test(data)) value = parseSerialWeight(currentClean);
+    if (value !== null && /[\r\n]/.test(data)) {
+      return { name: 'ASCII نصي — CR / LF', description: 'بيانات نصية تحتوي على رقم وزن وفواصل أسطر. هذا تنسيق شائع، ولا يحدد الشركة المصنعة للمؤشر.', confidence: 'متوسط — نمط نصي قابل للقراءة', weight: value };
+    }
+    if (value !== null) {
+      return { name: 'ASCII Continuous Stream', description: 'تدفق نصي مستمر يحتوي على قيمة رقمية. يلزم تجميع عدة عينات ومقارنة توقيت الرسائل للتأكد.', confidence: 'مبدئي — عينة رقمية واحدة', weight: value };
+    }
+    if (/[\x00-\x08\x0b\x0c\x0e-\x1f]/.test(data)) {
+      return { name: 'بيانات ثنائية / بروتوكول غير معروف', description: 'تم استقبال محارف تحكم أو بيانات غير نصية. تم حفظ العينة الخام للمراجعة، ولا يمكن تسمية البروتوكول بدقة من هذه العينة وحدها.', confidence: 'غير معروف', weight: null };
+    }
+    return { name: 'بروتوكول غير معروف', description: 'وصلت بيانات، لكن شكلها لا يطابق التنسيقات النصية والإطارات المعروفة حاليًا. تم حفظ العينة كما وردت.', confidence: 'غير معروف — يحتاج تحليل', weight: null };
+  }
+  function explorerReadableData(data) {
+    return String(data || '').replace(/\r/g, '\\r').replace(/\n/g, '\\n\n').replace(/\t/g, '\\t')
+      .replace(/[\x00-\x08\x0b\x0c\x0e-\x1f]/g, ch => '\\x' + (ch.charCodeAt(0) & 255).toString(16).padStart(2, '0'));
+  }
+  function recordDeviceExplorerData(data) {
+    if (!deviceExplorerCaptureActive) return;
+    const payload = data && typeof data === 'object' ? data : { text: String(data ?? '') };
+    const raw = String(payload.text ?? '');
+    if (!raw && !payload.hex && !payload.base64) return;
+    deviceExplorerRawBuffer = (deviceExplorerRawBuffer + raw).slice(-2048);
+    const detected = classifyExplorerProtocol(deviceExplorerRawBuffer, raw);
+    const weight = detected.weight;
+    const config = deviceExplorerCurrentConfig || {
+      baudRate: Number($('serialBaud')?.value || 0),
+      dataBits: Number($('serialDataBits')?.value || 8),
+      parity: $('serialParity')?.value || 'none',
+      stopBits: Number($('serialStopBits')?.value || 1)
+    };
+    const portPath = deviceExplorerCurrentConfig?.path || serialPort?.path || $('serialDevice')?.value || 'COM غير محدد';
+    const preview = explorerReadableData(raw).slice(0, 220);
+    const sample = {
+      at: new Date().toISOString(),
+      port: portPath,
+      config: { baudRate: config.baudRate, dataBits: config.dataBits, parity: config.parity, stopBits: config.stopBits },
+      protocol: detected.name,
+      confidence: detected.confidence,
+      weight,
+      rawLength: Number(payload.byteLength ?? raw.length),
+      raw: raw.slice(0, 1500),
+      hex: String(payload.hex || ''),
+      base64: String(payload.base64 || ''),
+      readable: explorerReadableData(raw).slice(0, 1200),
+      preview
+    };
+    deviceExplorerSamples.push(sample);
+    if (deviceExplorerSamples.length > 2000) deviceExplorerSamples.splice(0, deviceExplorerSamples.length - 2000);
+    deviceExplorerLastProtocol = { ...detected, port: portPath };
+    deviceExplorerSaveCounter++;
+    if (deviceExplorerSaveCounter >= 5) {
+      deviceExplorerSaveCounter = 0;
+      saveDeviceExplorerState();
+    }
+    if ($('view-devices')?.classList.contains('active')) renderDeviceExplorerSamples();
+  }
+  async function refreshDeviceExplorerPorts(showMessage = true) {
+    const status = $('explorerDeviceStatus');
+    if (!status) return;
+    status.textContent = 'جارٍ فحص المنافذ...';
+    try {
+      let ports = [];
+      if (desktop && window.desktopBridge?.listSerialPorts) {
+        ports = await window.desktopBridge.listSerialPorts();
+      } else if (navigator.serial?.getPorts) {
+        const browserPorts = await navigator.serial.getPorts();
+        ports = browserPorts.map((port, index) => {
+          const info = port.getInfo ? port.getInfo() : {};
+          return { path: 'منفذ متاح للمتصفح ' + (index + 1), vendorId: info.usbVendorId, productId: info.usbProductId, manufacturer: 'USB Serial (Web Serial)' };
+        });
+      } else {
+        deviceExplorerPorts = [];
+        status.textContent = 'اكتشاف المنافذ متاح في نسخة Windows';
+        $('explorerRuntimeStatus').textContent = 'نسخة الويب';
+        renderDeviceExplorerPorts();
+        $('explorerCaptureMessage').textContent = 'المتصفح لا يتيح قائمة المنافذ تلقائيًا. استخدم نسخة Windows لتشخيص أجهزة USB وCOM دون طلب صلاحيات منفصلة لكل جهاز.';
+        return;
+      }
+      deviceExplorerPorts = ports.map(port => ({
+        path: String(port.path || 'Serial'),
+        manufacturer: port.manufacturer || '',
+        vendorId: port.vendorId || '',
+        productId: port.productId || '',
+        serialNumber: port.serialNumber || '',
+        pnpId: port.pnpId || '',
+        locationId: port.locationId || '',
+        friendlyName: port.friendlyName || ''
+      }));
+      deviceExplorerScanAt = new Date().toISOString();
+      saveDeviceExplorerState();
+      $('explorerRuntimeStatus').textContent = desktop ? 'نسخة Windows Desktop' : 'Web Serial';
+      renderDeviceExplorerPorts();
+      if (showMessage) {
+        $('explorerCaptureMessage').textContent = deviceExplorerPorts.length
+          ? 'اكتمل الفحص. اختر منفذًا لمراجعة بياناته، ثم ابدأ تسجيل البيانات قبل تشغيل البحث التلقائي من صفحة الاتصال.'
+          : 'لم يظهر أي منفذ COM/Serial. هذا لا يمنع تشغيل البرنامج أو تسجيل الوزن يدويًا.';
+      }
+    } catch (error) {
+      status.textContent = 'تعذر فحص المنافذ';
+      $('explorerCaptureMessage').textContent = 'حدث خطأ أثناء فحص الأجهزة: ' + (error?.message || String(error));
+    }
+  }
+  function exportDeviceExplorerReport() {
+    const report = {
+      application: 'Weighbridge 120T',
+      generatedAt: new Date().toISOString(),
+      runtime: desktop ? 'Windows Desktop' : 'Web',
+      lastScanAt: deviceExplorerScanAt,
+      detectedPorts: deviceExplorerPorts,
+      lastProtocolDetection: deviceExplorerLastProtocol,
+      capturedSamples: deviceExplorerSamples,
+      note: 'USB vendor/chipset identity does not by itself prove the scale indicator protocol. Windows samples include the UTF-8 text and original serial bytes as HEX/Base64; Web Serial samples include the bytes exposed by the browser.'
+    };
+    const blob = new Blob([JSON.stringify(report, null, 2)], { type: 'application/json;charset=utf-8' });
+    const url = URL.createObjectURL(blob);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = 'weighbridge-device-diagnostic-' + new Date().toISOString().replace(/[:.]/g, '-') + '.json';
+    anchor.click();
+    URL.revokeObjectURL(url);
+    showToast('تم تجهيز تقرير تشخيص الأجهزة والبروتوكول');
+  }
+  function startDeviceExplorerCapture() {
+    deviceExplorerCaptureActive = true;
+    deviceExplorerRawBuffer = '';
+    renderDeviceExplorerCaptureStatus();
+    $('explorerCaptureMessage').textContent = serialPort || autoScanRunning
+      ? 'بدأ التسجيل من الاتصال الحالي. يتم حفظ العينات الواردة بالتتابع.'
+      : 'تم تفعيل وضع الانتظار. انتقل إلى «الاتصال بالأجهزة» وشغّل البحث التلقائي أو الاتصال اليدوي؛ المستكشف سيسجل كل عينة واردة دون تغيير منطق الاتصال.';
+  }
+  function stopDeviceExplorerCapture() {
+    deviceExplorerCaptureActive = false;
+    deviceExplorerSaveCounter = 0;
+    saveDeviceExplorerState();
+    renderDeviceExplorerCaptureStatus();
+    $('explorerCaptureMessage').textContent = 'تم إيقاف التسجيل وحفظ العينات المسجلة محليًا. يمكنك تصدير تقرير التشخيص لإرساله للمراجعة.';
+  }
+  function renderDeviceExplorer() {
+    renderDeviceExplorerPorts();
+    renderDeviceExplorerSamples();
+    renderDeviceExplorerCaptureStatus();
+  }
+
   function rowMarkup(r, detailed = false) {
-    const cells = '<td><strong>'+esc(r.id)+'</strong></td><td>'+esc(r.plate)+'</td>' +
-      (detailed ? '<td>'+esc(r.driver)+'</td>' : '') +
-      '<td>'+esc(r.customer)+'</td><td>'+fmt(r.firstWeight)+'</td><td>'+fmt(r.secondWeight)+'</td><td><strong class="net-cell">'+fmt(r.netWeight)+'</strong></td><td>'+stamp(new Date(r.createdAt))+'</td>' +
-      (detailed ? '<td><div class="table-actions"><button class="table-action" data-ticket="'+esc(r.id)+'">التذكرة</button><button class="table-action delete-row-action" data-delete-record="'+esc(r.id)+'">حذف</button></div></td>' : '');
+    const movement = esc(r.movementType || '—');
+    const cells = detailed
+      ? '<td><strong>'+esc(r.id)+'</strong></td><td>'+movement+'</td><td>'+esc(r.plate)+'</td><td>'+esc(r.trailer || '—')+'</td>' +
+        '<td>'+esc(r.driver)+'</td><td>'+esc(r.customer)+'</td><td>'+esc(r.shipment || '—')+'</td><td>'+esc(r.governorate || '—')+'</td>' +
+        '<td>'+fmt(r.firstWeight)+'</td><td>'+fmt(r.secondWeight)+'</td><td><strong class="net-cell">'+fmt(r.netWeight)+'</strong></td><td>'+stamp(new Date(r.createdAt))+'</td>' +
+        '<td><div class="table-actions"><button class="table-action" data-ticket="'+esc(r.id)+'">التذكرة</button><button class="table-action" data-export-ticket="'+esc(r.id)+'">تصدير Excel</button><button class="table-action delete-row-action" data-delete-record="'+esc(r.id)+'">حذف</button></div></td>'
+      : '<td><strong>'+esc(r.id)+'</strong></td><td>'+movement+'</td><td>'+esc(r.plate)+'</td><td>'+esc(r.trailer || '—')+'</td>' +
+        '<td>'+esc(r.customer)+'</td><td>'+esc(r.driver)+'</td><td>'+esc(r.shipment || '—')+'</td><td><strong class="net-cell">'+fmt(r.netWeight)+'</strong></td><td>'+stamp(new Date(r.createdAt))+'</td>' +
+        '<td><button class="table-action" data-export-ticket="'+esc(r.id)+'">تصدير ملف Excel</button></td>';
     return '<tr>'+cells+'</tr>';
   }
   function searchRecords(query) {
@@ -144,7 +537,7 @@
     if (!q) return records.slice();
     return records.filter(r => {
       const values = [
-        r.id, r.plate, r.driver, r.customer, r.source, r.firstSource, r.secondSource,
+        r.id, r.movementType, r.plate, r.trailer, r.driver, r.customer, r.shipment, r.governorate, r.source, r.firstSource, r.secondSource,
         r.firstWeight, r.secondWeight, r.netWeight, r.firstOriginalWeight, r.secondOriginalWeight,
         r.createdAt, r.firstTime, r.secondTime,
         r.createdAt ? stamp(new Date(r.createdAt)) : '',
@@ -193,7 +586,7 @@
     $('lastWeighing').textContent = records.length ? stamp(new Date(records[0].createdAt)) : '—';
     updateConnectionCard();
     $('sidebarDeviceStatus').textContent = serialPort ? (serialPort.auto ? 'تم التعرف على الميزان تلقائيًا' : 'الميزان متصل') : 'بانتظار توصيل الميزان';
-    $('recentTable').innerHTML = records.length ? records.slice(0,5).map(r=>rowMarkup(r)).join('') : '<tr class="empty-row"><td colspan="7">لا توجد عمليات مسجلة حتى الآن</td></tr>';
+    $('recentTable').innerHTML = records.length ? records.slice(0,5).map(r=>rowMarkup(r)).join('') : '<tr class="empty-row"><td colspan="10">لا توجد عمليات مسجلة حتى الآن</td></tr>';
     renderRecords();
     renderVehicles();
     renderReports();
@@ -232,10 +625,11 @@
   function switchView(name) {
     document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active',v.id==='view-'+name));
     document.querySelectorAll('.nav-link').forEach(v=>v.classList.toggle('active',v.dataset.view===name));
-    const titles={dashboard:'لوحة التشغيل',weighings:'سجل عمليات الوزن',vehicles:'السيارات والعملاء',reports:'التقارير والإحصائيات',connections:'الاتصال بأجهزة الوزن',settings:'إعدادات النظام'};
+    const titles={dashboard:'لوحة التشغيل',weighings:'سجل عمليات الوزن',vehicles:'السيارات والعملاء',reports:'التقارير والإحصائيات',devices:'الأجهزة والاتصال'};
     $('pageTitle').textContent=titles[name]||'لوحة التشغيل';
     $('sidebar').classList.remove('open');
     if(name==='weighings')renderRecords();
+    if(name==='devices')refreshDeviceExplorerPorts(false);
   }
   function parseSerialWeight(line) {
     const text = String(line || '').replace(/\u0000/g, '').trim();
@@ -409,6 +803,7 @@
           if (!autoDetectionEnabled || $('weightMode').value === 'manual') return;
           const config = configs[index];
           autoScanAttemptActive = true;
+          deviceExplorerCurrentConfig = { path: port.path, ...config };
           autoScanBuffer = '';
           autoScanReadings = [];
           autoScanDetected = null;
@@ -495,14 +890,15 @@
         autoDetectionEnabled = false;
         const selectedPath = $('serialDevice').value;
         if (!selectedPath) { showToast('اختر منفذ COM أولاً'); return; }
-        await window.desktopBridge.openSerialPort({
+        deviceExplorerCurrentConfig = {
           path: selectedPath,
           baudRate: Number($('serialBaud').value),
           dataBits: Number($('serialDataBits').value),
           stopBits: Number($('serialStopBits').value),
           parity: $('serialParity').value,
           flowControl: $('serialFlow').value
-        });
+        };
+        await window.desktopBridge.openSerialPort(deviceExplorerCurrentConfig);
         serialPort = { desktop: true, path: selectedPath };
         serialReading = true;
         desktopSerialBuffer = '';
@@ -525,8 +921,9 @@
       return;
     }
     try {
+      deviceExplorerCurrentConfig = { path: 'Web Serial', baudRate: Number($('serialBaud').value), dataBits: Number($('serialDataBits').value), stopBits: Number($('serialStopBits').value), parity: $('serialParity').value, flowControl: $('serialFlow').value };
       serialPort = await navigator.serial.requestPort();
-      await serialPort.open({ baudRate: Number($('serialBaud').value), dataBits: Number($('serialDataBits').value), stopBits: Number($('serialStopBits').value), parity: $('serialParity').value, flowControl: $('serialFlow').value });
+      await serialPort.open({ baudRate: deviceExplorerCurrentConfig.baudRate, dataBits: deviceExplorerCurrentConfig.dataBits, stopBits: deviceExplorerCurrentConfig.stopBits, parity: deviceExplorerCurrentConfig.parity, flowControl: deviceExplorerCurrentConfig.flowControl });
       serialReading = true;
       $('serialState').textContent = 'متصل — في انتظار بيانات الميزان';
       $('serialConnect').disabled = true;
@@ -573,7 +970,12 @@
         while (serialReading) {
           const result = await serialReader.read();
           if (result.done) break;
-          buffer += new TextDecoder().decode(result.value);
+          const incoming = new TextDecoder().decode(result.value);
+          const bytes = Array.from(result.value);
+          let base64 = '';
+          try { base64 = btoa(bytes.map(byte => String.fromCharCode(byte)).join('')); } catch {}
+          recordDeviceExplorerData({ text: incoming, byteLength: bytes.length, hex: bytes.map(byte => byte.toString(16).padStart(2, '0')).join(''), base64 });
+          buffer += incoming;
           if ($('protocolProfile').value === 'yaohua-a9') {
             const extracted = extractYaohuaA9Frames(buffer);
             buffer = extracted.rest;
@@ -618,6 +1020,249 @@
     renderAll();
     showToast('تم قطع الاتصال بالميزان');
   }
+  function excelRowForRecord(r) {
+    const original1 = Object.prototype.hasOwnProperty.call(r, 'firstOriginalWeight') ? r.firstOriginalWeight : r.firstWeight;
+    const original2 = Object.prototype.hasOwnProperty.call(r, 'secondOriginalWeight') ? r.secondOriginalWeight : r.secondWeight;
+    return {
+      'رقم التذكرة': r.id, 'نوع الحركة': r.movementType || '—', 'رقم السيارة': r.plate, 'رقم المقطورة': r.trailer || '—',
+      'السائق': r.driver, 'العميل': r.customer, 'اسم الشحنة': r.shipment || '—', 'المحافظة': r.governorate || '—',
+      'قراءة الأولى الأصلية (كجم)': original1 == null ? 'إدخال يدوي' : original1,
+      'الوزن الأول المعتمد (كجم)': r.firstWeight,
+      'فرق تعديل الأولى (كجم)': original1 == null ? '' : Number((r.firstWeight - original1).toFixed(2)),
+      'قراءة الثانية الأصلية (كجم)': original2 == null ? 'إدخال يدوي' : original2,
+      'الوزن الثاني المعتمد (كجم)': r.secondWeight,
+      'فرق تعديل الثانية (كجم)': original2 == null ? '' : Number((r.secondWeight - original2).toFixed(2)),
+      'صافي الحمولة (كجم)': r.netWeight, 'مصدر الأولى': r.firstSource || r.source,
+      'مصدر الثانية': r.secondSource || r.source,
+      'وقت الوزنة الأولى': r.firstTime || '', 'وقت الوزنة الثانية': r.secondTime || '',
+      'تاريخ العملية': stamp(new Date(r.createdAt))
+    };
+  }
+
+  function excelColumnName(index) {
+    let name = '';
+    let value = index + 1;
+    while (value > 0) {
+      const remainder = (value - 1) % 26;
+      name = String.fromCharCode(65 + remainder) + name;
+      value = Math.floor((value - 1) / 26);
+    }
+    return name;
+  }
+
+  function escapeExcelXml(value) {
+    return String(value ?? '')
+      .replace(/[\u0000-\u0008\u000B\u000C\u000E-\u001F]/g, '')
+      .replace(/&/g, '&amp;')
+      .replace(/</g, '&lt;')
+      .replace(/>/g, '&gt;')
+      .replace(/"/g, '&quot;')
+      .replace(/'/g, '&apos;');
+  }
+
+  function joinExcelBytes(chunks) {
+    const totalLength = chunks.reduce((sum, chunk) => sum + chunk.length, 0);
+    const result = new Uint8Array(totalLength);
+    let offset = 0;
+    for (const chunk of chunks) {
+      result.set(chunk, offset);
+      offset += chunk.length;
+    }
+    return result;
+  }
+
+  function crc32Excel(bytes) {
+    let crc = 0xFFFFFFFF;
+    for (let i = 0; i < bytes.length; i++) {
+      crc ^= bytes[i];
+      for (let bit = 0; bit < 8; bit++) {
+        crc = (crc >>> 1) ^ ((crc & 1) ? 0xEDB88320 : 0);
+      }
+    }
+    return (crc ^ 0xFFFFFFFF) >>> 0;
+  }
+
+  function zipExcelFiles(files) {
+    const encoder = new TextEncoder();
+    const localParts = [];
+    const centralParts = [];
+    let localOffset = 0;
+    const dosDate = 0x0021;
+
+    for (const file of files) {
+      const name = encoder.encode(file.name);
+      const data = encoder.encode(file.content);
+      const checksum = crc32Excel(data);
+
+      const localHeader = new Uint8Array(30);
+      const localView = new DataView(localHeader.buffer);
+      localView.setUint32(0, 0x04034B50, true);
+      localView.setUint16(4, 20, true);
+      localView.setUint16(6, 0x0800, true);
+      localView.setUint16(8, 0, true);
+      localView.setUint16(10, 0, true);
+      localView.setUint16(12, dosDate, true);
+      localView.setUint32(14, checksum, true);
+      localView.setUint32(18, data.length, true);
+      localView.setUint32(22, data.length, true);
+      localView.setUint16(26, name.length, true);
+      localView.setUint16(28, 0, true);
+      const localPart = joinExcelBytes([localHeader, name, data]);
+      localParts.push(localPart);
+
+      const centralHeader = new Uint8Array(46);
+      const centralView = new DataView(centralHeader.buffer);
+      centralView.setUint32(0, 0x02014B50, true);
+      centralView.setUint16(4, 20, true);
+      centralView.setUint16(6, 20, true);
+      centralView.setUint16(8, 0x0800, true);
+      centralView.setUint16(10, 0, true);
+      centralView.setUint16(12, 0, true);
+      centralView.setUint16(14, dosDate, true);
+      centralView.setUint32(16, checksum, true);
+      centralView.setUint32(20, data.length, true);
+      centralView.setUint32(24, data.length, true);
+      centralView.setUint16(28, name.length, true);
+      centralView.setUint16(30, 0, true);
+      centralView.setUint16(32, 0, true);
+      centralView.setUint16(34, 0, true);
+      centralView.setUint16(36, 0, true);
+      centralView.setUint32(38, 0, true);
+      centralView.setUint32(42, localOffset, true);
+      centralParts.push(joinExcelBytes([centralHeader, name]));
+
+      localOffset += localPart.length;
+    }
+
+    const centralDirectory = joinExcelBytes(centralParts);
+    const endRecord = new Uint8Array(22);
+    const endView = new DataView(endRecord.buffer);
+    endView.setUint32(0, 0x06054B50, true);
+    endView.setUint16(4, 0, true);
+    endView.setUint16(6, 0, true);
+    endView.setUint16(8, files.length, true);
+    endView.setUint16(10, files.length, true);
+    endView.setUint32(12, centralDirectory.length, true);
+    endView.setUint32(16, localOffset, true);
+    endView.setUint16(20, 0, true);
+
+    return joinExcelBytes([...localParts, centralDirectory, endRecord]);
+  }
+
+  function buildExcelWorkbookBlob(rows, requestedSheetName) {
+    const safeRows = Array.isArray(rows) ? rows : [];
+    const headers = Object.keys(safeRows[0] || {});
+    const table = [headers, ...safeRows.map(row => headers.map(header => row[header]))];
+    const lastColumn = excelColumnName(Math.max(0, headers.length - 1));
+    const sheetRows = table.map((cells, rowIndex) => {
+      const rowNumber = rowIndex + 1;
+      const cellXml = cells.map((value, columnIndex) => {
+        const reference = excelColumnName(columnIndex) + rowNumber;
+        if (value == null || value === '') return '<c r="' + reference + '"/>';
+        if (typeof value === 'number' && Number.isFinite(value)) {
+          return '<c r="' + reference + '"><v>' + String(value) + '</v></c>';
+        }
+        return '<c r="' + reference + '" t="inlineStr"><is><t xml:space="preserve">' +
+          escapeExcelXml(value) + '</t></is></c>';
+      }).join('');
+      return '<row r="' + rowNumber + '">' + cellXml + '</row>';
+    }).join('');
+    const columns = headers.map((_, index) => {
+      const column = index + 1;
+      return '<col min="' + column + '" max="' + column + '" width="23" customWidth="1"/>';
+    }).join('');
+    const sheetName = escapeExcelXml(String(requestedSheetName || 'Sheet1').slice(0, 31));
+
+    const files = [
+      {
+        name: '[Content_Types].xml',
+        content: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+          '<Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types">' +
+          '<Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/>' +
+          '<Default Extension="xml" ContentType="application/xml"/>' +
+          '<Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/>' +
+          '<Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/>' +
+          '</Types>'
+      },
+      {
+        name: '_rels/.rels',
+        content: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+          '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+          '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/>' +
+          '</Relationships>'
+      },
+      {
+        name: 'xl/workbook.xml',
+        content: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+          '<workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" ' +
+          'xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships">' +
+          '<sheets><sheet name="' + sheetName + '" sheetId="1" r:id="rId1"/></sheets></workbook>'
+      },
+      {
+        name: 'xl/_rels/workbook.xml.rels',
+        content: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+          '<Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships">' +
+          '<Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/>' +
+          '</Relationships>'
+      },
+      {
+        name: 'xl/worksheets/sheet1.xml',
+        content: '<?xml version="1.0" encoding="UTF-8" standalone="yes"?>' +
+          '<worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main">' +
+          '<dimension ref="A1:' + lastColumn + table.length + '"/>' +
+          '<sheetViews><sheetView workbookViewId="0"/></sheetViews>' +
+          '<sheetFormatPr defaultRowHeight="18"/><cols>' + columns + '</cols>' +
+          '<sheetData>' + sheetRows + '</sheetData>' +
+          '<autoFilter ref="A1:' + lastColumn + table.length + '"/>' +
+          '</worksheet>'
+      }
+    ];
+    const bytes = zipExcelFiles(files);
+    return new Blob([bytes], {
+      type: 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+    });
+  }
+
+  function downloadExcelBlob(blob, fileName) {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = fileName;
+    document.body.appendChild(link);
+    link.click();
+    link.remove();
+    setTimeout(() => URL.revokeObjectURL(url), 1500);
+  }
+
+  async function exportTicketExcel(id) {
+    const record = records.find(r => r.id === id);
+    if (!record) { showToast('لم يتم العثور على المعاملة المطلوبة'); return; }
+    if (desktop && window.desktopBridge?.exportExcel) {
+      try {
+        const result = await window.desktopBridge.exportExcel([record], {
+          fileName: 'Weighbridge-Ticket-' + record.id + '.xlsx',
+          openAfterExport: true
+        });
+        if (!result.canceled) showToast('تم تصدير وفتح ملف Excel للتذكرة ' + record.id);
+      } catch (error) { showToast('تعذر تصدير ملف Excel: ' + error.message); }
+      return;
+    }
+    if (!window.XLSX) {
+      const row = excelRowForRecord(record);
+      const blob = buildExcelWorkbookBlob([row], 'بيانات التذكرة');
+      downloadExcelBlob(blob, 'Weighbridge-Ticket-' + record.id + '.xlsx');
+      showToast('تم تنزيل ملف Excel للتذكرة ' + record.id);
+      return;
+    }
+    const row = excelRowForRecord(record);
+    const sheet = XLSX.utils.json_to_sheet([row]);
+    sheet['!cols'] = Object.keys(row).map(() => ({ wch: 23 }));
+    const book = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(book, sheet, 'بيانات التذكرة');
+    XLSX.writeFile(book, 'Weighbridge-Ticket-' + record.id + '.xlsx');
+    showToast('تم تنزيل ملف Excel للتذكرة ' + record.id);
+  }
+
   async function exportExcel() {
     if (!records.length) { showToast('لا توجد عمليات لتصديرها'); return; }
     if (desktop && window.desktopBridge?.exportExcel) {
@@ -627,24 +1272,14 @@
       } catch (error) { showToast('تعذر تصدير Excel: ' + error.message); }
       return;
     }
-    if (!window.XLSX) { showToast('مكتبة Excel لم تُحمّل. تحقق من اتصال الإنترنت.'); return; }
-    const rows = records.slice().reverse().map(r => {
-      const original1 = Object.prototype.hasOwnProperty.call(r, 'firstOriginalWeight') ? r.firstOriginalWeight : r.firstWeight;
-      const original2 = Object.prototype.hasOwnProperty.call(r, 'secondOriginalWeight') ? r.secondOriginalWeight : r.secondWeight;
-      return {
-        'رقم التذكرة': r.id, 'رقم السيارة': r.plate, 'السائق': r.driver, 'العميل': r.customer,
-        'قراءة الأولى الأصلية (كجم)': original1 == null ? 'إدخال يدوي' : original1,
-        'الوزن الأول المعتمد (كجم)': r.firstWeight,
-        'فرق تعديل الأولى (كجم)': original1 == null ? '' : Number((r.firstWeight - original1).toFixed(2)),
-        'قراءة الثانية الأصلية (كجم)': original2 == null ? 'إدخال يدوي' : original2,
-        'الوزن الثاني المعتمد (كجم)': r.secondWeight,
-        'فرق تعديل الثانية (كجم)': original2 == null ? '' : Number((r.secondWeight - original2).toFixed(2)),
-        'صافي الحمولة (كجم)': r.netWeight, 'مصدر الأولى': r.firstSource || r.source,
-        'مصدر الثانية': r.secondSource || r.source,
-        'وقت الوزنة الأولى': r.firstTime || '', 'وقت الوزنة الثانية': r.secondTime || '',
-        'تاريخ العملية': stamp(new Date(r.createdAt))
-      };
-    });
+    if (!window.XLSX) {
+      const rows = records.slice().reverse().map(excelRowForRecord);
+      const blob = buildExcelWorkbookBlob(rows, 'سجل الوزن');
+      downloadExcelBlob(blob, 'Weighbridge-120T-Records-' + dateKey(now()) + '.xlsx');
+      showToast('تم تنزيل ملف Excel بنجاح');
+      return;
+    }
+    const rows = records.slice().reverse().map(excelRowForRecord);
     const sheet = XLSX.utils.json_to_sheet(rows);
     sheet['!cols'] = Object.keys(rows[0]).map(() => ({ wch: 23 }));
     const book = XLSX.utils.book_new();
@@ -655,8 +1290,8 @@
 
   function exportCSV() {
     if(!records.length){showToast('لا توجد عمليات لتصديرها');return;}
-    const header=['رقم التذكرة','السيارة','السائق','العميل','الوزنة الأولى كجم','الوزنة الثانية كجم','الصافي كجم','التاريخ'];
-    const lines=[header,...records.map(r=>[r.id,r.plate,r.driver,r.customer,r.firstWeight,r.secondWeight,r.netWeight,stamp(new Date(r.createdAt))])];
+    const header=['رقم التذكرة','نوع الحركة','رقم السيارة','رقم المقطورة','اسم العميل','اسم السائق','اسم الشحنة','المحافظة','الوزنة الأولى كجم','الوزنة الثانية كجم','الوزن الصافي كجم','التاريخ'];
+    const lines=[header,...records.map(r=>[r.id,r.movementType || '—',r.plate,r.trailer || '—',r.customer,r.driver,r.shipment || '—',r.governorate || '—',r.firstWeight,r.secondWeight,r.netWeight,stamp(new Date(r.createdAt))])];
     const csv='\uFEFF'+lines.map(row=>row.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\r\n');
     const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
     const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='weighbridge-records.csv';a.click();URL.revokeObjectURL(url);
@@ -666,26 +1301,35 @@
   document.querySelectorAll('[data-view]').forEach(b=>b.addEventListener('click',()=>switchView(b.dataset.view)));
   document.querySelectorAll('[data-go]').forEach(b=>b.addEventListener('click',()=>switchView(b.dataset.go)));
   $('mobileMenu').addEventListener('click',()=>$('sidebar').classList.toggle('open'));
-  $('applyManualWeight').addEventListener('click',()=>{
-    const raw = $('manualWeight').value;
-    const value = Number(raw);
-    if (raw === '' || !Number.isFinite(value) || value < 0 || value > CAPACITY) {
-      showToast('أدخل وزنًا صحيحًا من 0 إلى 500,000 كجم'); return;
-    }
+  $('manualWeight').addEventListener('input',()=>{
     $('weightMode').value = 'manual';
     activeWeightSource = 'manual';
     rawScaleWeight = null;
+    const raw = $('manualWeight').value;
+    if (raw === '') {
+      setWeight(0);
+      setStability(false);
+      $('formMessage').textContent = '';
+      return;
+    }
+    const value = Number(raw);
+    if (!Number.isFinite(value) || value < 0 || value > CAPACITY) {
+      setStability(false);
+      $('formMessage').textContent = 'أدخل وزنًا صحيحًا من 0 إلى 500,000 كجم.';
+      return;
+    }
     setWeight(value);
     setStability(true);
-    $('formMessage').textContent = 'تم اعتماد الوزن يدويًا.';
-    showToast('تم اعتماد الوزن اليدوي');
+    $('formMessage').textContent = firstCapture
+      ? 'قراءة الوزنة الثانية تتحدث تلقائيًا. اضغط تسجيل الوزنة الثانية عند استقرار الوزن.'
+      : 'قراءة الوزن تتحدث تلقائيًا. اضغط تسجيل الوزنة الأولى عند استقرار الوزن.';
   });
   $('weightMode').addEventListener('change',()=>{
     if ($('weightMode').value === 'manual') {
       activeWeightSource = 'manual';
       rawScaleWeight = null;
-      $('formMessage').textContent = 'وضع الإدخال اليدوي مفعل. قراءة الكابل لن تغيّر الوزن الحالي.';
-      $('manualWeight').value = liveWeight;
+      $('formMessage').textContent = 'وضع الإدخال اليدوي مفعل. اكتب الوزن وسيتم تحديث القراءة تلقائيًا.';
+      $('manualWeight').value = firstCapture && !secondCapture ? '' : liveWeight > 0 ? liveWeight : '';
     } else {
       activeWeightSource = 'waiting';
       rawScaleWeight = null;
@@ -753,6 +1397,26 @@
     $('openExcelFile').disabled = true;
   }
   $('serialConnect').addEventListener('click',connectSerial);
+  $('explorerRefreshPorts').addEventListener('click', () => refreshDeviceExplorerPorts(true));
+  $('explorerExportReport').addEventListener('click', exportDeviceExplorerReport);
+  $('explorerCaptureStart').addEventListener('click', startDeviceExplorerCapture);
+  $('explorerCaptureStop').addEventListener('click', stopDeviceExplorerCapture);
+  $('explorerClearLog').addEventListener('click', () => {
+    if (!deviceExplorerSamples.length) { showToast('سجل العينات فارغ بالفعل'); return; }
+    deviceExplorerSamples = [];
+    deviceExplorerLastProtocol = null;
+    deviceExplorerRawBuffer = '';
+    deviceExplorerSaveCounter = 0;
+    saveDeviceExplorerState();
+    renderDeviceExplorerSamples();
+    showToast('تم مسح سجل عينات التشخيص');
+  });
+  $('explorerPortsTable').addEventListener('click', event => {
+    const button = event.target.closest('[data-explorer-port]');
+    if (!button) return;
+    deviceExplorerSelectedPath = button.dataset.explorerPort;
+    renderDeviceExplorerPorts();
+  });
   $('serialDisconnect').addEventListener('click',disconnectSerial);
 
     $('protocolProfile').addEventListener('change', () => {
@@ -837,8 +1501,10 @@
     });
 
     window.desktopBridge.onSerialData(data => {
-      if (autoScanAttemptActive) consumeAutoScanData(data);
-      else consumeDesktopSerialData(data);
+      const incoming = typeof data === 'string' ? data : String(data?.text ?? '');
+      recordDeviceExplorerData(data);
+      if (autoScanAttemptActive) consumeAutoScanData(incoming);
+      else consumeDesktopSerialData(incoming);
     });
     window.desktopBridge.onSerialError(error => {
       if (!autoScanAttemptActive) $('serialState').textContent = 'خطأ في منفذ COM: ' + error;
@@ -916,11 +1582,14 @@
     const deleteButton = e.target.closest('[data-delete-record]');
     if (deleteButton) { deleteRecord(deleteButton.dataset.deleteRecord); return; }
     if (e.target.closest('[data-delete-all-records]')) { deleteAllRecords(); return; }
+    const exportButton = e.target.closest('[data-export-ticket]');
+    if (exportButton) { exportTicketExcel(exportButton.dataset.exportTicket); return; }
     const ticketButton = e.target.closest('[data-ticket]');
     if (ticketButton) { const r=records.find(x=>x.id===ticketButton.dataset.ticket); if(r)openTicket(r); }
   });
   $('saveSettings').addEventListener('click',()=>{settings.systemName=$('systemName').value.trim()||'Weighbridge 120T';writeJSON(SETTINGS_KEY,settings);document.title=settings.systemName+' | نظام إدارة البسكول';$('settingsMessage').textContent='تم حفظ الإعدادات.';showToast('تم حفظ الإعدادات');});
   $('clearData').addEventListener('click',deleteAllRecords);
   $('systemName').value=settings.systemName||'Weighbridge 120T';
+  renderDeviceExplorer();
   setWeight(liveWeight);setStability(true);updateCaptureUI();renderAll();
 })();

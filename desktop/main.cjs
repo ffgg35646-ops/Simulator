@@ -72,13 +72,16 @@ function getStoredRecords() {
 
 function makeExcelWorkbook(records) {
   const headers = [
-    'رقم التذكرة', 'رقم السيارة', 'السائق', 'العميل',
+    'رقم التذكرة', 'نوع الحركة', 'رقم السيارة', 'رقم المقطورة', 'اسم السائق', 'اسم العميل', 'اسم الشحنة', 'المحافظة',
     'قراءة الميزان الأصلية الأولى (كجم)', 'الوزن المعتمد الأول (كجم)', 'فرق تعديل الأولى (كجم)',
     'قراءة الميزان الأصلية الثانية (كجم)', 'الوزن المعتمد الثاني (كجم)', 'فرق تعديل الثانية (كجم)',
     'صافي الحمولة المعتمد (كجم)', 'مصدر الوزنة الأولى', 'مصدر الوزنة الثانية',
     'وقت الوزنة الأولى', 'وقت الوزنة الثانية', 'تاريخ إنشاء التذكرة'
   ];
-  const detailHeaders = ['رقم التذكرة', 'رقم السيارة', 'الوزنة', 'القراءة الأصلية (كجم)', 'الوزن المعتمد (كجم)', 'فرق التعديل (كجم)', 'مصدر الوزن', 'وقت التسجيل'];
+  const detailHeaders = [
+    'رقم التذكرة', 'نوع الحركة', 'رقم السيارة', 'رقم المقطورة', 'اسم السائق', 'اسم العميل', 'اسم الشحنة', 'المحافظة',
+    'الوزنة', 'القراءة الأصلية (كجم)', 'الوزن المعتمد (كجم)', 'فرق التعديل (كجم)', 'مصدر الوزن', 'وقت التسجيل'
+  ];
   const valueOf = (record, originalKey, approvedKey) => {
     if (Object.prototype.hasOwnProperty.call(record, originalKey)) return record[originalKey];
     return record[approvedKey] ?? null;
@@ -90,7 +93,7 @@ function makeExcelWorkbook(records) {
     const firstRaw = original1(r);
     const secondRaw = original2(r);
     return [
-      r.id || '', r.plate || '', r.driver || '', r.customer || '',
+      r.id || '', r.movementType || '—', r.plate || '', r.trailer || '—', r.driver || '', r.customer || '', r.shipment || '—', r.governorate || '—',
       firstRaw == null ? 'إدخال يدوي' : firstRaw, r.firstWeight ?? '', adjustment(firstRaw, r.firstWeight),
       secondRaw == null ? 'إدخال يدوي' : secondRaw, r.secondWeight ?? '', adjustment(secondRaw, r.secondWeight),
       r.netWeight ?? '', r.firstSource || r.source || '', r.secondSource || r.source || '',
@@ -104,19 +107,19 @@ function makeExcelWorkbook(records) {
       { label: 'الثانية', raw: original2(r), approved: r.secondWeight, source: r.secondSource || r.source, time: r.secondTime }
     ]) {
       detailRows.push([
-        r.id || '', r.plate || '', item.label,
-        item.raw == null ? 'إدخال يدوي' : item.raw,
+        r.id || '', r.movementType || '—', r.plate || '', r.trailer || '—', r.driver || '', r.customer || '', r.shipment || '—', r.governorate || '—',
+        item.label, item.raw == null ? 'إدخال يدوي' : item.raw,
         item.approved ?? '', adjustment(item.raw, item.approved),
         item.source || '', item.time || ''
       ]);
     }
   }
   const tickets = XLSX.utils.aoa_to_sheet([headers, ...ticketRows]);
-  tickets['!cols'] = [22,18,20,24,25,22,20,25,22,20,23,24,24,24,24,24].map(wch => ({ wch }));
-  tickets['!autofilter'] = { ref: `A1:P${Math.max(1, ticketRows.length + 1)}` };
+  tickets['!cols'] = [22,14,18,18,20,24,22,18,25,22,20,25,22,20,23,24,24,24,24,24].map(wch => ({ wch }));
+  tickets['!autofilter'] = { ref: `A1:T${Math.max(1, ticketRows.length + 1)}` };
   const details = XLSX.utils.aoa_to_sheet([detailHeaders, ...detailRows]);
-  details['!cols'] = [22,18,14,23,22,20,24,24].map(wch => ({ wch }));
-  details['!autofilter'] = { ref: `A1:H${Math.max(1, detailRows.length + 1)}` };
+  details['!cols'] = [22,14,18,18,20,24,22,18,14,23,22,20,24,24].map(wch => ({ wch }));
+  details['!autofilter'] = { ref: `A1:N${Math.max(1, detailRows.length + 1)}` };
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, tickets, 'سجل الوزن');
   XLSX.utils.book_append_sheet(workbook, details, 'تفاصيل الوزنتين');
@@ -188,17 +191,26 @@ ipcMain.handle('excel:open-file', async () => {
   if (openError) throw new Error(openError);
   return { path: status.path };
 });
-ipcMain.handle('excel:export', async (_event, rendererRecords) => {
+ipcMain.handle('excel:export', async (_event, rendererRecords, options = {}) => {
+  const requestedName = String(options?.fileName || '').trim()
+    .replace(/[<>:"/\\|?*\x00-\x1F]/g, '-')
+    .replace(/\.xlsx$/i, '');
+  const defaultName = requestedName || 'Weighbridge-120T-Export-' + new Date().toISOString().slice(0,10);
   const result = await dialog.showSaveDialog(mainWindow, {
-    title: 'تصدير نسخة Excel',
+    title: 'تصدير ملف Excel',
     buttonLabel: 'حفظ ملف Excel',
-    defaultPath: path.join(app.getPath('documents'), `Weighbridge-120T-Export-${new Date().toISOString().slice(0,10)}.xlsx`),
+    defaultPath: path.join(app.getPath('documents'), defaultName + '.xlsx'),
     filters: [{ name: 'Excel Workbook', extensions: ['xlsx'] }]
   });
   if (result.canceled || !result.filePath) return { canceled: true };
   const targetPath = result.filePath.toLowerCase().endsWith('.xlsx') ? result.filePath : result.filePath + '.xlsx';
   const rows = Array.isArray(rendererRecords) ? rendererRecords : getStoredRecords();
-  return { canceled: false, ok: true, path: writeExcelFile(rows, targetPath), count: rows.length };
+  const savedPath = writeExcelFile(rows, targetPath);
+  if (options?.openAfterExport) {
+    const openError = await shell.openPath(savedPath);
+    if (openError) throw new Error(openError);
+  }
+  return { canceled: false, ok: true, path: savedPath, count: rows.length };
 });
 
 ipcMain.handle('serial:list', async () => SerialPort.list());
@@ -217,7 +229,7 @@ ipcMain.handle('serial:open', async (_event, config) => {
   });
   await new Promise((resolve, reject) => port.open(error => error ? reject(error) : resolve()));
   serialDevice = port;
-  port.on('data', chunk => mainWindow?.webContents.send('serial:data', chunk.toString('utf8')));
+  port.on('data', chunk => mainWindow?.webContents.send('serial:data', { text: chunk.toString('utf8'), hex: chunk.toString('hex'), base64: chunk.toString('base64'), byteLength: chunk.length }));
   port.on('error', error => mainWindow?.webContents.send('serial:error', error.message));
   port.on('close', () => { mainWindow?.webContents.send('serial:closed'); if (serialDevice === port) serialDevice = null; });
   return { connected: true, path: portPath };
@@ -251,11 +263,34 @@ ipcMain.handle('tcp:disconnect', () => { tcpSocket?.destroy(); tcpSocket = null;
 
 app.whenReady().then(() => {
   openDatabase();
-  syncExcelRecords(getStoredRecords());
+
+  // Avoid rebuilding the entire Excel workbook before the window appears.
+  const initialRecords = getStoredRecords();
+  const linkedExcelPath = currentExcelPath();
+  if (fs.existsSync(linkedExcelPath)) {
+    let updatedAt;
+    try { updatedAt = fs.statSync(linkedExcelPath).mtime.toISOString(); } catch {}
+    excelSyncState = { ok: true, path: linkedExcelPath, count: initialRecords.length, updatedAt };
+  } else {
+    excelSyncState = {
+      ok: initialRecords.length === 0,
+      path: linkedExcelPath,
+      count: initialRecords.length,
+      ...(initialRecords.length ? { error: 'سيتم إنشاء ملف Excel بعد فتح البرنامج.' } : {})
+    };
+  }
+
   session.defaultSession.setPermissionCheckHandler((_wc, permission) => permission === 'serial' || permission === 'hid');
   session.defaultSession.webRequest.onBeforeRequest({ urls: ['http://*/*', 'https://*/*'] }, (_details, callback) => callback({ cancel: true }));
   session.defaultSession.setPermissionRequestHandler((_wc, permission, callback) => callback(permission === 'serial' || permission === 'hid'));
   createWindow();
+
+  if (initialRecords.length && !fs.existsSync(linkedExcelPath)) {
+    mainWindow.webContents.once('did-finish-load', () => {
+      setTimeout(() => syncExcelRecords(initialRecords), 350);
+    });
+  }
+
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 });
 app.on('before-quit', () => { tcpSocket?.destroy(); if (serialDevice?.isOpen) serialDevice.close(); db?.close(); });

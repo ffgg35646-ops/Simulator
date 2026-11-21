@@ -21,8 +21,7 @@
         <button class="nav-link" data-view="weighings"><span class="nav-icon">▤</span> سجل الوزن</button>
         <button class="nav-link" data-view="vehicles"><span class="nav-icon">▰</span> السيارات والعملاء</button>
         <button class="nav-link" data-view="reports"><span class="nav-icon">▥</span> التقارير</button>
-        <button class="nav-link" data-view="connections"><span class="nav-icon">⌁</span> الاتصال بالأجهزة</button>
-        <button class="nav-link" data-view="settings"><span class="nav-icon">⚙</span> الإعدادات</button>
+        <button class="nav-link" data-view="devices">الأجهزة والاتصال</button>
       </nav>
       <div class="sidebar-bottom">
         <div class="opensource-card"><span class="pulse-dot"></span><div><strong>نظام الوزن</strong><small id="sidebarDeviceStatus">بانتظار توصيل الميزان</small></div></div>
@@ -56,23 +55,43 @@
               <div class="capacity-labels"><span>0 كجم</span><strong id="capacityPercent">21.38% من السعة</strong><span>500 طن</span></div>
             </div>
             <div class="manual-entry">
-              <div class="manual-entry-head"><div><strong>إدخال / تعديل الوزن يدويًا</strong><small>أدخل الوزن أو صحّح قراءة الميزان قبل اعتمادها</small></div><span class="manual-tag">MANUAL</span></div>
-              <div class="manual-weight-row"><input id="manualWeight" type="number" min="0" max="500000" step="0.01" placeholder="أدخل الوزن بالكيلوجرام" inputmode="decimal" /><button class="btn btn-primary" id="applyManualWeight" type="button">اعتماد الوزن</button></div>
-              <p class="manual-note">يمكن تصحيح قراءة الميزان يدويًا؛ سيحتفظ السجل بالقراءة الأصلية والوزن المعتمد بعد التعديل.</p>
+              <div class="manual-entry-head"><div><strong>إدخال / تعديل الوزن يدويًا</strong></div><span class="manual-tag">MANUAL</span></div>
+              <div class="manual-weight-row"><input id="manualWeight" type="number" min="0" max="500000" step="0.01" placeholder="ادخل الوزن" inputmode="decimal" /></div>
               <label class="weight-mode-label">مصدر الوزن<select id="weightMode"><option value="auto" selected>تلقائي — من الميزان المتصل</option><option value="manual">يدوي — إدخال الوزن بنفسك</option></select></label>
             </div>
             <div class="capture-area">
-              <div class="capture-title"><div><strong>تسجيل عملية وزن</strong><small>التذكرة تتكون من وزنتين لنفس السيارة</small></div><span class="step-pill" id="weighStep">الوزنة الأولى</span></div>
-              <div class="form-grid">
-                <label>رقم السيارة<input id="plateInput" placeholder="مثال: أ ب ج 1234" /></label>
+              <div class="capture-title"><div><strong>تسجيل عملية وزن</strong><small id="captureHelp">أدخل بيانات العملية ثم سجّل الوزنة الأولى</small></div><span class="step-pill" id="weighStep">الوزنة الأولى</span></div>
+              <div class="form-grid" id="ticketDetailsFields">
+                <label>اسم العميل<input id="customerInput" placeholder="اسم العميل أو الشركة" /></label>
                 <label>اسم السائق<input id="driverInput" placeholder="اسم السائق" /></label>
-                <label class="full-field">العميل / الشركة<input id="customerInput" placeholder="اسم العميل أو الشركة" /></label>
+                <label class="full-field">اسم الشحنة<input id="shipmentInput" placeholder="اسم أو وصف الشحنة" /></label>
+                <label>المحافظة
+                  <select id="governorateInput">
+                    <option value="">اختر المحافظة</option>
+                    <option>القاهرة</option><option>الجيزة</option><option>الإسكندرية</option><option>الدقهلية</option>
+                    <option>البحيرة</option><option>الغربية</option><option>المنوفية</option><option>كفر الشيخ</option>
+                    <option>دمياط</option><option>الشرقية</option><option>القليوبية</option><option>بورسعيد</option>
+                    <option>الإسماعيلية</option><option>السويس</option><option>شمال سيناء</option><option>جنوب سيناء</option>
+                    <option>الفيوم</option><option>بني سويف</option><option>المنيا</option><option>أسيوط</option>
+                    <option>سوهاج</option><option>قنا</option><option>الأقصر</option><option>أسوان</option>
+                    <option>البحر الأحمر</option><option>الوادي الجديد</option><option>مطروح</option>
+                  </select>
+                </label>
+                <label>نوع الحركة
+                  <select id="movementTypeInput">
+                    <option value="وارد" selected>وارد</option>
+                    <option value="صادر">صادر</option>
+                  </select>
+                </label>
+                <label>رقم السيارة<input id="plateInput" placeholder="مثال: أ ب ج 1234" /></label>
+                <label>رقم المقطورة<input id="trailerInput" placeholder="رقم المقطورة" /></label>
               </div>
+              <div class="ticket-details-summary" id="ticketDetailsSummary" hidden></div>
               <div class="weigh-captures">
-                <div class="capture-box"><span>الوزنة الأولى</span><strong id="firstWeight">—</strong><small id="firstTime">لم تسجل بعد</small></div>
-                <div class="capture-arrow">←</div>
-                <div class="capture-box"><span>الوزنة الثانية</span><strong id="secondWeight">—</strong><small id="secondTime">لم تسجل بعد</small></div>
-                <div class="capture-box net-box"><span>صافي الحمولة</span><strong id="netWeight">—</strong><small>الفرق بين الوزنتين</small></div>
+                <div class="capture-box" id="firstCaptureBox"><span>الوزنة الأولى</span><strong id="firstWeight">—</strong><small id="firstTime">لم تسجل بعد</small></div>
+                <div class="capture-arrow" id="captureArrow" hidden>←</div>
+                <div class="capture-box" id="secondCaptureBox" hidden><span>الوزنة الثانية</span><strong id="secondWeight">—</strong><small id="secondTime">لم تسجل بعد</small></div>
+                <div class="capture-box net-box" id="netCaptureBox" hidden><span>صافي الحمولة</span><strong id="netWeight">—</strong><small>الفرق بين الوزنتين</small></div>
               </div>
               <div class="capture-buttons"><button class="btn btn-primary btn-large" id="captureWeight">تسجيل الوزنة الأولى</button><button class="btn btn-outline" id="resetTicket">عملية جديدة</button></div>
               <p class="inline-message" id="formMessage" role="status"></p>
@@ -81,18 +100,201 @@
 
           
         </div>
-        <section class="panel recent-panel"><div class="panel-heading"><div><span class="eyebrow">LATEST ACTIVITY</span><h3>أحدث عمليات الوزن</h3></div><button class="text-button" data-go="weighings">عرض الكل ←</button></div><div class="table-wrap"><table><thead><tr><th>رقم التذكرة</th><th>السيارة</th><th>العميل</th><th>الوزن الأول</th><th>الوزن الثاني</th><th>الصافي</th><th>التاريخ</th></tr></thead><tbody id="recentTable"><tr class="empty-row"><td colspan="7">لا توجد عمليات مسجلة حتى الآن</td></tr></tbody></table></div></section>
+        <section class="panel recent-panel"><div class="panel-heading"><div><span class="eyebrow">LATEST ACTIVITY</span><h3>أحدث عمليات الوزن</h3></div><button class="text-button" data-go="weighings">عرض الكل ←</button></div><div class="table-wrap"><table><thead><tr><th>رقم التذكرة</th><th>نوع الحركة</th><th>السيارة</th><th>المقطورة</th><th>العميل</th><th>السائق</th><th>الشحنة</th><th>الصافي</th><th>التاريخ</th><th>ملف Excel</th></tr></thead><tbody id="recentTable"><tr class="empty-row"><td colspan="10">لا توجد عمليات مسجلة حتى الآن</td></tr></tbody></table></div></section>
       </section>
 
-      <section class="view" id="view-weighings"><div class="section-intro"><div><h2>سجل عمليات الوزن</h2><p>جميع التذاكر المحفوظة محليًا، مع مزامنة تلقائية إلى ملف Excel في نسخة Windows.</p><small class="excel-sync-status" id="excelSyncStatus" role="status">جارٍ تجهيز ملف Excel...</small></div><div class="record-actions"><button class="btn btn-quiet" id="openExcelFile" type="button">فتح ملف Excel</button><button class="btn btn-outline" id="chooseExcelFile" type="button">تغيير مكان الملف</button><button class="btn btn-outline" id="exportRecords">تصدير CSV ↓</button><button class="btn btn-primary" id="exportExcel">تصدير Excel .xlsx ↓</button><button class="btn btn-danger-ghost" type="button" data-delete-all-records>حذف كل السجلات</button></div></div><div class="panel"><div class="toolbar"><div class="search-controls"><input id="recordSearch" class="search-input" placeholder="ابحث برقم التذكرة أو السيارة أو العميل أو التاريخ أو الوزن..." /><button class="btn btn-outline" type="button" id="clearRecordSearch">مسح البحث</button></div><span class="record-count" id="recordCount">0 عملية</span></div><div class="table-wrap"><table><thead><tr><th>رقم التذكرة</th><th>السيارة</th><th>السائق</th><th>العميل</th><th>الوزن الأول</th><th>الوزن الثاني</th><th>الصافي</th><th>التاريخ</th><th>إجراء</th></tr></thead><tbody id="recordsTable"><tr class="empty-row"><td colspan="9">لا توجد عمليات مسجلة</td></tr></tbody></table></div></div></section>
+      <section class="view" id="view-weighings"><div class="section-intro"><div><h2>سجل عمليات الوزن</h2><p>جميع التذاكر المحفوظة محليًا، مع مزامنة تلقائية إلى ملف Excel في نسخة Windows.</p><small class="excel-sync-status" id="excelSyncStatus" role="status">جارٍ تجهيز ملف Excel...</small></div><div class="record-actions"><button class="btn btn-quiet" id="openExcelFile" type="button">فتح ملف Excel</button><button class="btn btn-outline" id="chooseExcelFile" type="button">تغيير مكان الملف</button><button class="btn btn-outline" id="exportRecords">تصدير CSV ↓</button><button class="btn btn-primary" id="exportExcel">تصدير Excel .xlsx ↓</button><button class="btn btn-danger-ghost" type="button" data-delete-all-records>حذف كل السجلات</button></div></div><div class="panel"><div class="toolbar"><div class="search-controls"><input id="recordSearch" class="search-input" placeholder="ابحث برقم التذكرة أو السيارة أو المقطورة أو العميل أو السائق أو الشحنة أو المحافظة أو نوع الحركة..." /><button class="btn btn-outline" type="button" id="clearRecordSearch">مسح البحث</button></div><span class="record-count" id="recordCount">0 عملية</span></div><div class="table-wrap"><table><thead><tr><th>رقم التذكرة</th><th>نوع الحركة</th><th>رقم السيارة</th><th>رقم المقطورة</th><th>السائق</th><th>العميل</th><th>اسم الشحنة</th><th>المحافظة</th><th>الوزن الأول</th><th>الوزن الثاني</th><th>الصافي</th><th>التاريخ</th><th>إجراء</th></tr></thead><tbody id="recordsTable"><tr class="empty-row"><td colspan="13">لا توجد عمليات مسجلة</td></tr></tbody></table></div></div></section>
 
       <section class="view" id="view-vehicles"><div class="section-intro"><div><h2>السيارات والعملاء</h2><p>ملخص السيارات والعملاء الذين ظهرت بياناتهم في التذاكر.</p></div></div><div class="stats-grid compact-stats"><article class="stat-card"><div class="stat-icon teal">▰</div><div><span>عدد السيارات</span><strong id="vehicleCount">0</strong></div></article><article class="stat-card"><div class="stat-icon blue">♙</div><div><span>عدد السائقين</span><strong id="driverCount">0</strong></div></article><article class="stat-card"><div class="stat-icon purple">▣</div><div><span>عدد العملاء</span><strong id="customerCount">0</strong></div></article></div><div class="panel"><div class="panel-heading"><div><h3>السيارات المسجلة تلقائيًا</h3><small>تُستخرج من عمليات الوزن المحفوظة</small></div></div><div class="table-wrap"><table><thead><tr><th>رقم السيارة</th><th>السائق الأخير</th><th>العميل الأخير</th><th>عدد العمليات</th><th>إجمالي صافي الوزن</th></tr></thead><tbody id="vehiclesTable"><tr class="empty-row"><td colspan="5">لا توجد بيانات بعد</td></tr></tbody></table></div></div></section>
 
-      <section class="view" id="view-reports"><div class="section-intro"><div><h2>التقارير والإحصائيات</h2><p>ابحث داخل جميع التذاكر؛ وستتغير الإجماليات والمتوسطات والرسم البياني حسب النتائج.</p></div><div class="record-actions"><button class="btn btn-danger-ghost" type="button" data-delete-all-records>حذف كل السجلات</button><button class="btn btn-outline" id="printReport">طباعة التقرير</button></div></div><div class="panel report-search-panel"><div class="toolbar"><div class="search-controls"><input id="reportSearch" class="search-input" placeholder="ابحث برقم التذكرة أو السيارة أو السائق أو العميل أو التاريخ أو الوزن..." /><button class="btn btn-outline" type="button" id="clearReportSearch">مسح البحث</button></div><span class="record-count" id="reportResultCount">0 نتيجة</span></div></div><div class="stats-grid"><article class="stat-card"><div class="stat-icon teal">▤</div><div><span>إجمالي العمليات</span><strong id="reportCount">0</strong></div></article><article class="stat-card"><div class="stat-icon blue">▰</div><div><span>إجمالي صافي الوزن</span><strong id="reportNet">0 كجم</strong></div></article><article class="stat-card"><div class="stat-icon amber">◉</div><div><span>متوسط الحمولة</span><strong id="reportAverage">0 كجم</strong></div></article></div><div class="panel report-panel"><div class="panel-heading"><div><h3>ملخص آخر 7 أيام</h3><small>عدد عمليات الوزن المسجلة يوميًا</small></div></div><div class="chart" id="weeklyChart"><div class="chart-empty">ستظهر الإحصائيات بعد تسجيل عمليات الوزن.</div></div></div><div class="panel"><div class="panel-heading"><div><h3>السجلات المطابقة</h3><small>يمكنك فتح التذكرة أو حذف سجل محدد من نتائج البحث</small></div></div><div class="table-wrap"><table><thead><tr><th>رقم التذكرة</th><th>السيارة</th><th>السائق</th><th>العميل</th><th>الوزن الأول</th><th>الوزن الثاني</th><th>الصافي</th><th>التاريخ</th><th>إجراء</th></tr></thead><tbody id="reportRecordsTable"><tr class="empty-row"><td colspan="9">لا توجد عمليات مسجلة</td></tr></tbody></table></div></div></section>
+      <section class="view" id="view-reports"><div class="section-intro"><div><h2>التقارير والإحصائيات</h2><p>ابحث داخل جميع التذاكر؛ وستتغير الإجماليات والمتوسطات والرسم البياني حسب النتائج.</p></div><div class="record-actions"><button class="btn btn-danger-ghost" type="button" data-delete-all-records>حذف كل السجلات</button><button class="btn btn-outline" id="printReport">طباعة التقرير</button></div></div><div class="panel report-search-panel"><div class="toolbar"><div class="search-controls"><input id="reportSearch" class="search-input" placeholder="ابحث برقم التذكرة أو السيارة أو المقطورة أو السائق أو العميل أو الشحنة أو المحافظة أو نوع الحركة..." /><button class="btn btn-outline" type="button" id="clearReportSearch">مسح البحث</button></div><span class="record-count" id="reportResultCount">0 نتيجة</span></div></div><div class="stats-grid"><article class="stat-card"><div class="stat-icon teal">▤</div><div><span>إجمالي العمليات</span><strong id="reportCount">0</strong></div></article><article class="stat-card"><div class="stat-icon blue">▰</div><div><span>إجمالي صافي الوزن</span><strong id="reportNet">0 كجم</strong></div></article><article class="stat-card"><div class="stat-icon amber">◉</div><div><span>متوسط الحمولة</span><strong id="reportAverage">0 كجم</strong></div></article></div><div class="panel report-panel"><div class="panel-heading"><div><h3>ملخص آخر 7 أيام</h3><small>عدد عمليات الوزن المسجلة يوميًا</small></div></div><div class="chart" id="weeklyChart"><div class="chart-empty">ستظهر الإحصائيات بعد تسجيل عمليات الوزن.</div></div></div><div class="panel"><div class="panel-heading"><div><h3>السجلات المطابقة</h3><small>يمكنك فتح التذكرة أو حذف سجل محدد من نتائج البحث</small></div></div><div class="table-wrap"><table><thead><tr><th>رقم التذكرة</th><th>نوع الحركة</th><th>رقم السيارة</th><th>رقم المقطورة</th><th>السائق</th><th>العميل</th><th>اسم الشحنة</th><th>المحافظة</th><th>الوزن الأول</th><th>الوزن الثاني</th><th>الصافي</th><th>التاريخ</th><th>إجراء</th></tr></thead><tbody id="reportRecordsTable"><tr class="empty-row"><td colspan="13">لا توجد عمليات مسجلة</td></tr></tbody></table></div></div></section>
 
-      <section class="view" id="view-connections"><div class="section-intro"><div><h2>الاتصال بأجهزة الوزن</h2><p>وصّل كابل الميزان باللاب فقط؛ البرنامج يبحث تلقائيًا عن المنفذ وإعدادات الاتصال والبروتوكول.</p></div><span class="warning-pill">Universal Protocol Engine</span></div><div class="connection-grid"><article class="panel protocol-card selected"><div class="protocol-icon">⌁</div><h3>توصيل الميزان بالكابل</h3><p>يدعم محولات USB-to-RS232 وUSB Serial؛ بمجرد توصيلها باللاب يكتشف البرنامج منفذ COM ويحاول قراءة الوزن وضبط الإعدادات تلقائيًا.</p><div class="protocol-state auto-detection-status" id="serialState">بانتظار توصيل كابل الميزان — سيكتشف البرنامج المنفذ وإعدادات الاتصال تلقائيًا.</div><div class="auto-connection-actions"><button class="btn btn-primary" type="button" id="autoSerialSettings">بحث تلقائي عن الميزان</button><span>وصّل الكابل باللاب فقط؛ لا تحتاج لاختيار COM أو بروتوكول.</span></div><details class="advanced-connection-settings"><summary>إعدادات متقدمة (اختياري للدعم الفني)</summary><div class="serial-controls"><label>منفذ COM<select id="serialDevice"><option value="">اختر منفذ الميزان</option></select></label><div class="serial-buttons"><button class="btn btn-outline" type="button" id="refreshSerialPorts">تحديث قائمة المنافذ</button></div><label>ملف الإعدادات<select id="protocolProfile"><option value="auto" selected>اكتشاف تلقائي / عام</option><option value="rice-continuous">Rice Lake — Continuous ASCII</option><option value="rice-demand">Rice Lake — Demand / Request</option><option value="mettler">Mettler Toledo — ASCII (عام)</option><option value="avery">Avery Weigh-Tronix — ASCII (عام)</option><option value="cas">CAS — ASCII (عام)</option><option value="generic">مؤشر عام — ASCII</option><option value="yaohua-a9">YAOHUA XK3190-A9 / A9+ — إطار الوزن مع XOR</option><option value="stx-etx">STX / ETX Framing</option><option value="raw-stream">Raw ASCII Stream</option></select></label><label>سرعة الاتصال Baud Rate<input id="serialBaud" type="number" min="50" max="1000000" step="1" value="9600" /></label><div class="serial-config-grid"><label>Data Bits<select id="serialDataBits"><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8" selected>8</option></select></label><label>Parity<select id="serialParity"><option value="none">None</option><option value="even">Even</option><option value="odd">Odd</option><option value="mark">Mark</option><option value="space">Space</option></select></label><label>Stop Bits<select id="serialStopBits"><option value="1" selected>1</option><option value="2">2</option></select></label><label>Flow Control<select id="serialFlow"><option value="none">None</option><option value="hardware">Hardware (RTS/CTS)</option></select></label></div><label>طريقة فصل الرسائل<select id="serialMode"><option value="lines">CR أو LF</option><option value="yaohua-a9">YAOHUA A9 — إطار 12 بايت + XOR</option><option value="stx">STX … ETX</option><option value="continuous">تدفق مستمر / نافذة قراءة</option></select></label><label>وحدة الوزن الافتراضية<select id="serialUnit"><option value="auto" selected>تلقائي حسب الرسالة</option><option value="kg">kg</option><option value="lb">lb</option><option value="g">g</option><option value="ton">ton</option></select></label><div class="serial-buttons"><button class="btn btn-primary" id="serialConnect">اتصال يدوي (متقدم)</button><button class="btn btn-outline" id="serialDisconnect" disabled>قطع الاتصال</button></div></div></details></article><article class="panel protocol-card"><div class="protocol-icon">▣</div><h3>USB</h3><p>USB-to-Serial يعمل من خلال منفذ COM أعلاه. أجهزة USB HID المباشرة تحتاج تعريفًا خاصًا حسب الشركة.</p><div class="protocol-state">USB Serial مدعوم عبر COM</div><button class="btn btn-outline btn-block" type="button" id="usbHelp">عرض منافذ USB Serial</button></article><article class="panel protocol-card"><div class="protocol-icon">⌘</div><h3>Ethernet TCP/IP</h3><p>اتصال مباشر بعنوان IP ومنفذ TCP داخل الشبكة المحلية (نسخة Windows).</p><div class="protocol-state" id="tcpState">متاح في نسخة Windows</div><div class="serial-controls"><label>عنوان IP أو اسم الجهاز<input id="tcpHost" placeholder="192.168.1.100" /></label><label>Port<input id="tcpPort" type="number" min="1" max="65535" value="10001" /></label><div class="serial-buttons"><button class="btn btn-primary" id="tcpConnect">اتصال TCP</button><button class="btn btn-outline" id="tcpDisconnect" disabled>قطع الاتصال</button></div></div></article></div><div class="panel note-panel"><strong>ملاحظة فنية</strong><p>المحرك يوفّر يدعم التطبيق منافذ RS-232 وRS-485 ومحولات USB-to-Serial عبر COM، مع إعدادات Baud/Data/Parity/Stop وملفات ASCII وCR/LF وSTX/ETX. أسماء الشركات ملفات إعداد أولية وليست ضمانًا لبروتوكولها المغلق. أجهزة USB HID والبروتوكولات الثنائية أو الخاصة تحتاج Driver/Parser مناسبًا؛ لا يمكن ضمان قراءة كل جهاز دون مواصفاته أو اختبار فعلي.</p></div></section>
+      
+      <section class="view" id="view-devices">
+        <div class="section-intro device-center-intro">
+          <div>
+            <h2>الأجهزة والاتصال</h2>
+            <p>إدارة اتصال الميزان، اكتشاف الأجهزة، فحص البروتوكولات وحفظ بيانات التشخيص من مكان واحد.</p>
+            <small class="explorer-last-scan" id="explorerLastScan">لم يتم إجراء فحص بعد.</small>
+          </div>
+          <div class="record-actions">
+            <button class="btn btn-primary" type="button" id="explorerRefreshPorts">فحص الأجهزة والمنافذ</button>
+            <button class="btn btn-outline" type="button" id="explorerExportReport">تصدير تقرير التشخيص</button>
+          </div>
+        </div>
 
-      <section class="view" id="view-settings"><div class="section-intro"><div><h2>إعدادات النظام</h2><p>إعدادات عامة للنسخة التجريبية.</p></div></div><div class="panel settings-panel"><div class="settings-row"><div><strong>اسم النظام</strong><small>الاسم الظاهر في الواجهة والتذاكر</small></div><input id="systemName" value="Weighbridge 120T" /></div><div class="settings-row"><div><strong>السعة القصوى</strong><small>الحد الأعلى للوزن بالكيلوجرام</small></div><div class="setting-value">500,000 كجم <span>500 طن</span></div></div><div class="settings-row"><div><strong>وحدة القياس</strong><small>الوحدة الأساسية للقراءات</small></div><div class="setting-value">كيلوجرام (KG)</div></div><div class="settings-row"><div><strong>تخزين البيانات</strong><small id="storageDescription">تُحفظ البيانات محليًا داخل المتصفح</small></div><span class="storage-badge" id="storageMode">Local Storage</span></div><div class="settings-actions"><button class="btn btn-primary" id="saveSettings">حفظ الإعدادات</button><button class="btn btn-danger-ghost" id="clearData">مسح بيانات التجربة</button></div><p class="inline-message" id="settingsMessage" role="status"></p></div></section>
+        <div class="integrated-summary-strip" aria-label="ملخص الأجهزة">
+          <div><span>منافذ الاتصال</span><strong id="explorerPortCount">0</strong></div>
+          <div><span>محولات USB المعروفة</span><strong id="explorerUsbCount">0</strong></div>
+          <div><span>عينات البيانات المحفوظة</span><strong id="explorerSampleCount">0</strong></div>
+          <div><span>حالة تسجيل البيانات</span><strong id="explorerCaptureStatus">متوقف</strong><small id="explorerCaptureHint">لا يتم تسجيل بيانات حاليًا</small></div>
+        </div>
+
+        <div class="integrated-connection-grid">
+          <section class="panel integrated-serial-panel">
+            <div class="panel-heading">
+              <div><span class="eyebrow">USB / RS-232 / RS-485</span><h3>الاتصال التسلسلي بالميزان</h3></div>
+            </div>
+            <div class="protocol-state auto-detection-status" id="serialState">بانتظار توصيل كابل الميزان</div>
+            <p class="integrated-description">وصّل كابل الميزان أو محول USB-to-Serial بالكمبيوتر. يبدأ البرنامج البحث عن المنفذ وإعدادات القراءة تلقائيًا.</p>
+            <div class="integrated-main-actions">
+              <button class="btn btn-primary btn-large" type="button" id="autoSerialSettings">بحث تلقائي عن الميزان</button>
+              <button class="btn btn-outline" type="button" id="usbHelp">تحديث معلومات USB</button>
+            </div>
+            <details class="advanced-connection-settings">
+              <summary>إعدادات الاتصال المتقدمة</summary>
+              <div class="serial-controls">
+                <label>منفذ COM<select id="serialDevice"><option value="">اختر منفذ الميزان</option></select></label>
+                <div class="serial-buttons"><button class="btn btn-outline" type="button" id="refreshSerialPorts">تحديث قائمة المنافذ</button></div>
+                <label>ملف البروتوكول
+                  <select id="protocolProfile">
+                    <option value="auto" selected>اكتشاف تلقائي / عام</option>
+                    <option value="rice-continuous">Rice Lake — Continuous ASCII</option>
+                    <option value="rice-demand">Rice Lake — Demand / Request</option>
+                    <option value="mettler">Mettler Toledo — ASCII (عام)</option>
+                    <option value="avery">Avery Weigh-Tronix — ASCII (عام)</option>
+                    <option value="cas">CAS — ASCII (عام)</option>
+                    <option value="generic">مؤشر عام — ASCII</option>
+                    <option value="yaohua-a9">YAOHUA XK3190-A9 / A9+ — إطار الوزن مع XOR</option>
+                    <option value="stx-etx">STX / ETX Framing</option>
+                    <option value="raw-stream">Raw ASCII Stream</option>
+                  </select>
+                </label>
+                <label>سرعة الاتصال Baud Rate<input id="serialBaud" type="number" min="50" max="1000000" step="1" value="9600" /></label>
+                <div class="serial-config-grid">
+                  <label>Data Bits<select id="serialDataBits"><option value="5">5</option><option value="6">6</option><option value="7">7</option><option value="8" selected>8</option></select></label>
+                  <label>Parity<select id="serialParity"><option value="none">None</option><option value="even">Even</option><option value="odd">Odd</option><option value="mark">Mark</option><option value="space">Space</option></select></label>
+                  <label>Stop Bits<select id="serialStopBits"><option value="1" selected>1</option><option value="2">2</option></select></label>
+                  <label>Flow Control<select id="serialFlow"><option value="none">None</option><option value="hardware">Hardware (RTS/CTS)</option></select></label>
+                </div>
+                <label>طريقة فصل الرسائل<select id="serialMode"><option value="lines">CR أو LF</option><option value="yaohua-a9">YAOHUA A9 — إطار 12 بايت + XOR</option><option value="stx">STX … ETX</option><option value="continuous">تدفق مستمر / نافذة قراءة</option></select></label>
+                <label>وحدة الوزن الافتراضية<select id="serialUnit"><option value="auto" selected>تلقائي حسب الرسالة</option><option value="kg">kg</option><option value="lb">lb</option><option value="g">g</option><option value="ton">ton</option></select></label>
+                <div class="serial-buttons"><button class="btn btn-primary" id="serialConnect">اتصال يدوي</button><button class="btn btn-outline" id="serialDisconnect" disabled>قطع الاتصال</button></div>
+              </div>
+            </details>
+            <p class="explorer-footnote">USB Serial وUSB-to-RS232 يظهران عادةً كمنفذ COM. أجهزة USB HID المباشرة قد تحتاج تعريفًا أو محلّلًا خاصًا بالشركة.</p>
+          </section>
+
+          <section class="panel integrated-tcp-panel">
+            <div class="panel-heading">
+              <div><span class="eyebrow">ETHERNET</span><h3>اتصال الشبكة TCP/IP</h3></div>
+              <span class="mini-status">نسخة Windows</span>
+            </div>
+            <p class="integrated-description">استخدم هذا الاتصال عندما يرسل مؤشر الميزان قراءاته عبر الشبكة المحلية.</p>
+            <div class="serial-controls">
+              <label>عنوان IP أو اسم الجهاز<input id="tcpHost" placeholder="192.168.1.100" /></label>
+              <label>منفذ TCP<input id="tcpPort" type="number" min="1" max="65535" value="10001" /></label>
+              <div class="integrated-tcp-status" id="tcpState">متاح في نسخة Windows</div>
+              <div class="serial-buttons"><button class="btn btn-primary" id="tcpConnect">اتصال TCP</button><button class="btn btn-outline" id="tcpDisconnect" disabled>قطع الاتصال</button></div>
+            </div>
+            <div class="integrated-technical-note">
+              <strong>ملاحظة التوافق</strong>
+              <p>تتوفر إعدادات RS-232 وRS-485 وUSB Serial وTCP. أسماء الشركات في ملفات الإعدادات هي تنسيقات أولية، ولا تضمن قراءة البروتوكولات المغلقة أو أجهزة USB HID دون مواصفاتها واختبارها.</p>
+            </div>
+          </section>
+        </div>
+
+        <div class="explorer-section-heading">
+          <div><h3>اكتشاف الأجهزة</h3><p>قائمة المنافذ المتاحة وبيانات المحول الذي يتعرف عليه نظام التشغيل.</p></div>
+          <span class="mini-status" id="explorerRuntimeStatus">جارٍ تحديد بيئة التشغيل</span>
+        </div>
+
+        <div class="integrated-device-grid">
+          <section class="panel">
+            <div class="panel-heading">
+              <div><span class="eyebrow">AVAILABLE PORTS</span><h3>الأجهزة والمنافذ المكتشفة</h3></div>
+              <span class="mini-status" id="explorerDeviceStatus">بانتظار الفحص</span>
+            </div>
+            <div class="table-wrap">
+              <table class="explorer-table">
+                <thead><tr><th>المنفذ</th><th>الشركة / نوع المحول</th><th>VID : PID</th><th>الرقم التسلسلي</th><th>التصنيف</th><th>التفاصيل</th></tr></thead>
+                <tbody id="explorerPortsTable"><tr class="empty-row"><td colspan="6">اضغط «فحص الأجهزة والمنافذ» لعرض الأجهزة المتاحة.</td></tr></tbody>
+              </table>
+            </div>
+            <p class="explorer-footnote">قد يظهر الجهاز باسم USB Serial Device أو باسم شريحة التحويل فقط. هذا يحدد محول الاتصال ولا يثبت وحده نوع بروتوكول مؤشر الميزان.</p>
+          </section>
+
+          <section class="panel explorer-selected-panel">
+            <div class="panel-heading">
+              <div><span class="eyebrow">DEVICE DETAILS</span><h3>تفاصيل الجهاز المحدد</h3></div>
+              <span class="mini-status" id="explorerSelectedBadge">لا يوجد تحديد</span>
+            </div>
+            <div class="explorer-selected-device" id="explorerSelectedDevice">
+              <div class="explorer-empty-state"><strong>لم يتم اختيار جهاز</strong><span>نفّذ الفحص ثم اختر أحد المنافذ من الجدول.</span></div>
+            </div>
+            <div class="explorer-capture-controls">
+              <div>
+                <strong>تسجيل البيانات الواردة</strong>
+                <small>يسجل البيانات التي تمر عبر اتصال الميزان الحالي أو أثناء البحث التلقائي، ولا يفتح منفذًا ثانيًا.</small>
+              </div>
+              <div class="serial-buttons">
+                <button class="btn btn-primary" type="button" id="explorerCaptureStart">بدء تسجيل البيانات</button>
+                <button class="btn btn-outline" type="button" id="explorerCaptureStop" disabled>إيقاف التسجيل</button>
+              </div>
+            </div>
+            <p class="explorer-capture-message" id="explorerCaptureMessage" role="status">ابدأ التسجيل، ثم شغّل البحث التلقائي أو الاتصال اليدوي من نفس الصفحة.</p>
+          </section>
+        </div>
+
+        <div class="explorer-section-heading">
+          <div><h3>تشخيص البروتوكول والبيانات</h3><p>تحليل القراءة المستقبلة وحفظ شكل البيانات حتى عند عدم التعرف على البروتوكول.</p></div>
+        </div>
+        <div class="integrated-analysis-grid">
+          <section class="panel">
+            <div class="panel-heading">
+              <div><span class="eyebrow">PROTOCOL ANALYSIS</span><h3>نتيجة التعرف على البروتوكول</h3></div>
+              <span class="mini-status" id="explorerProtocolBadge">لم تصل بيانات</span>
+            </div>
+            <div class="explorer-protocol-result">
+              <div>
+                <small>أقرب تنسيق تم التعرف عليه</small>
+                <strong id="explorerProtocolName">لم يتم التعرف عليه بعد</strong>
+                <p id="explorerProtocolDescription">يلزم استقبال بيانات فعلية من مؤشر الميزان قبل تحديد تنسيق الرسائل.</p>
+              </div>
+            </div>
+            <div class="explorer-protocol-meta">
+              <div><span>درجة التعرف</span><strong id="explorerProtocolConfidence">—</strong></div>
+              <div><span>آخر وزن قابل للاستخراج</span><strong id="explorerProtocolWeight">—</strong></div>
+              <div><span>آخر منفذ مصدر</span><strong id="explorerProtocolPort">—</strong></div>
+            </div>
+            <p class="explorer-footnote">التعرف على شكل البيانات لا يضمن دعم بروتوكول مغلق بالكامل. عند ظهور «غير معروف»، صدّر التقرير لإضافة محلّل مناسب بعد مراجعة البيانات.</p>
+          </section>
+          <section class="panel">
+            <div class="panel-heading">
+              <div><span class="eyebrow">RAW DATA</span><h3>آخر بيانات خام مستقبلة</h3></div>
+              <span class="mini-status" id="explorerRawSize">0 بايت</span>
+            </div>
+            <pre class="explorer-raw-output" id="explorerRawPreview">لا توجد بيانات مستقبلة حتى الآن.</pre>
+            <div class="explorer-raw-legend"><span>النص المستلم وتمثيل HEX</span><span>تظهر محارف التحكم بصيغة مرئية</span></div>
+          </section>
+        </div>
+
+        <section class="panel explorer-history-panel">
+          <div class="panel-heading">
+            <div><span class="eyebrow">DIAGNOSTIC LOG</span><h3>سجل عينات الاتصال</h3><small>يُحفظ السجل محليًا على هذا الكمبيوتر أو المتصفح.</small></div>
+            <button class="btn btn-danger-ghost" type="button" id="explorerClearLog">مسح سجل العينات</button>
+          </div>
+          <div class="table-wrap">
+            <table class="explorer-table explorer-log-table">
+              <thead><tr><th>الوقت</th><th>المنفذ</th><th>إعداد القراءة</th><th>التنسيق المحتمل</th><th>قيمة الوزن</th><th>البيانات المستلمة</th></tr></thead>
+              <tbody id="explorerSamplesTable"><tr class="empty-row"><td colspan="6">لم يتم تسجيل عينات بعد.</td></tr></tbody>
+            </table>
+          </div>
+        </section>
+
+        <details class="system-settings-details">
+          <summary>إعدادات البرنامج العامة</summary>
+          <div class="panel settings-panel">
+            <div class="settings-row"><div><strong>اسم النظام</strong><small>الاسم الظاهر في الواجهة والتذاكر</small></div><input id="systemName" value="Weighbridge 120T" /></div>
+            <div class="settings-row"><div><strong>السعة القصوى</strong><small>الحد الأعلى للوزن بالكيلوجرام</small></div><div class="setting-value">500,000 كجم <span>500 طن</span></div></div>
+            <div class="settings-row"><div><strong>وحدة القياس</strong><small>الوحدة الأساسية للقراءات</small></div><div class="setting-value">كيلوجرام (KG)</div></div>
+            <div class="settings-row"><div><strong>تخزين البيانات</strong><small id="storageDescription">تُحفظ البيانات محليًا داخل المتصفح</small></div><span class="storage-badge" id="storageMode">Local Storage</span></div>
+            <div class="settings-actions"><button class="btn btn-primary" id="saveSettings">حفظ الإعدادات</button><button class="btn btn-danger-ghost" id="clearData">مسح بيانات التجربة</button></div>
+            <p class="inline-message" id="settingsMessage" role="status"></p>
+          </div>
+        </details>
+      </section>
+
       <footer class="app-footer"><span>WEIGHBRIDGE 120T</span><span>نسخة ويب تجريبية · البيانات محفوظة على هذا المتصفح</span></footer>
     </main>
   </div>
