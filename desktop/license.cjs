@@ -21,7 +21,7 @@ function getMachineFingerprint() {
         '/v',
         'MachineGuid'
       ], { windowsHide: true, stdio: ['ignore', 'pipe', 'ignore'] }).toString();
-      machineId = output.match(/MachineGuid\\s+REG_SZ\\s+(.+)/i)?.[1]?.trim() || '';
+      machineId = output.match(/MachineGuid\s+REG_SZ\s+(.+)/i)?.[1]?.trim() || '';
     } catch {}
   }
   const source = [machineId, os.hostname(), process.platform, os.arch()].join('|');
