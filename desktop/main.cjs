@@ -5,6 +5,7 @@ const net = require('node:net');
 const Database = require('better-sqlite3');
 const { SerialPort } = require('serialport');
 const XLSX = require('xlsx');
+const { checkTrialLicense } = require('./license.cjs');
 
 let db;
 let tcpSocket = null;
@@ -262,6 +263,16 @@ ipcMain.handle('tcp:write', (_event, data) => {
 ipcMain.handle('tcp:disconnect', () => { tcpSocket?.destroy(); tcpSocket = null; return true; });
 
 app.whenReady().then(() => {
+  const license = checkTrialLicense(app.getPath('appData'));
+  if (!license.allowed) {
+    dialog.showErrorBox(
+      'ترخيص البرنامج مطلوب',
+      'انتهت صلاحية هذه النسخة التجريبية أو تعذر التحقق من صلاحيتها.\n\nلابد من ترخيص البرنامج لمتابعة الاستخدام.'
+    );
+    app.quit();
+    return;
+  }
+
   openDatabase();
 
   // Avoid rebuilding the entire Excel workbook before the window appears.
