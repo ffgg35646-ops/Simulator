@@ -210,3 +210,11 @@ html.desktop-auth-required .app-shell{display:none!important}
   #ticketDetailsFields.form-grid{grid-template-columns:minmax(0,1fr)}
   #ticketDetailsFields.form-grid>label{grid-column:auto}
 }
+
+/* Keep vehicle and trailer numbers side by side on the same row */
+#ticketDetailsFields .vehicle-number-field,
+#ticketDetailsFields .trailer-number-field{grid-row:3}
+@media(max-width:560px){
+  #ticketDetailsFields .vehicle-number-field,
+  #ticketDetailsFields .trailer-number-field{grid-row:auto}
+}
