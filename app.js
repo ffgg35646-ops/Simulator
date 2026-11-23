@@ -8,7 +8,7 @@
   let startSerialMonitoring = null;
   let stopSerialMonitoring = null;
   let serialMonitorTimer = null;
-  let records = readJSON(STORAGE_KEY, []);
+  let records = desktop ? [] : readJSON(STORAGE_KEY, []);
   let settings = readJSON(SETTINGS_KEY, { systemName: 'Weighbridge 120T' });
   let liveWeight = 0;
   let rawScaleWeight = null;
@@ -587,7 +587,8 @@
   function deleteAllRecords() {
     if (!records.length) { showToast('لا توجد سجلات لحذفها'); return; }
     const count = records.length;
-    if (!confirm('تحذير: سيتم حذف سجلات هذا المستخدم فقط (' + count + ' عملية) نهائيًا. هل تريد المتابعة؟')) return;
+    const scopeText = activeUser?.role === 'operator' ? 'سجلات هذا المستخدم فقط' : 'جميع السجلات';
+    if (!confirm('تحذير: سيتم حذف ' + scopeText + ' (' + count + ' عملية) نهائيًا. هل تريد المتابعة؟')) return;
     records = [];
     activeRecord = null;
     $('ticketModal').classList.remove('open');
