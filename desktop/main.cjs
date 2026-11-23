@@ -42,9 +42,14 @@ function openDatabase() {
       role TEXT NOT NULL CHECK(role IN ('operator','supervisor')),
       password_salt TEXT NOT NULL,
       password_hash TEXT NOT NULL,
+      must_change_password INTEGER NOT NULL DEFAULT 0,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
   `);
+  const userColumns = db.prepare('PRAGMA table_info(app_users)').all();
+  if (!userColumns.some(column => column.name === 'must_change_password')) {
+    db.exec('ALTER TABLE app_users ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0');
+  }
   const get = db.prepare('SELECT value FROM app_kv WHERE key = ?');
   const put = db.prepare(`INSERT INTO app_kv(key,value,updated_at) VALUES(?,?,CURRENT_TIMESTAMP)
     ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=CURRENT_TIMESTAMP`);
@@ -121,8 +126,56 @@ function publicUser(row) {
     username: row.username || '',
     email: row.email || '',
     displayName: row.display_name,
-    role: row.role
+    role: row.role,
+    mustChangePassword: Boolean(row.must_change_password)
   };
+}
+
+function seedDefaultAccounts() {
+  if (db.prepare('SELECT COUNT(*) AS count FROM app_users').get().count > 0) return false;
+
+  const definitions = [
+    { username: 'scale01', displayName: 'مستخدم الميزان الأول', role: 'operator', password: 'Sadat#Scale1201' },
+    { username: 'scale02', displayName: 'مستخدم الميزان الثاني', role: 'operator', password: 'Sadat#Scale1202' },
+    { email: 'supervisor@weighbridge.local', displayName: 'مشرف النظام', role: 'supervisor', password: 'Sadat#Admin120T' }
+  ];
+  const accounts = definitions.map(definition => {
+    const salt = crypto.randomBytes(16).toString('hex');
+    return {
+      id: crypto.randomUUID(),
+      username: definition.username || null,
+      email: definition.email || null,
+      display_name: definition.displayName,
+      role: definition.role,
+      password_salt: salt,
+      password_hash: passwordHash(definition.password, salt),
+      must_change_password: 1
+    };
+  });
+
+  const oldRecords = getStoredRecords();
+  const migrated = oldRecords.map(record => record.createdByUserId ? record : ({
+    ...record,
+    createdByUserId: accounts[0].id,
+    createdByUserName: accounts[0].display_name,
+    createdByUsername: accounts[0].username,
+    importedBeforeLogin: true
+  }));
+  const insertAccount = db.prepare('INSERT INTO app_users(id,username,email,display_name,role,password_salt,password_hash,must_change_password) VALUES(?,?,?,?,?,?,?,?)');
+  const saveRecords = db.prepare(`INSERT INTO app_kv(key,value,updated_at) VALUES(?,?,CURRENT_TIMESTAMP)
+    ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=CURRENT_TIMESTAMP`);
+  const insertRecord = db.prepare('INSERT OR REPLACE INTO weight_records(id,payload,created_at) VALUES(?,?,?)');
+  const tx = db.transaction(() => {
+    for (const account of accounts) {
+      insertAccount.run(account.id, account.username, account.email, account.display_name, account.role, account.password_salt, account.password_hash, account.must_change_password);
+    }
+    saveRecords.run(RECORDS_KEY, JSON.stringify(migrated));
+    db.prepare('DELETE FROM weight_records').run();
+    for (const record of migrated) insertRecord.run(String(record.id), JSON.stringify(record), String(record.createdAt || new Date().toISOString()));
+  });
+  tx();
+  syncExcelRecords(migrated);
+  return true;
 }
 
 function registerAuthHandlers() {
@@ -133,7 +186,7 @@ function registerAuthHandlers() {
       serialDevice = null;
     }
     if (tcpSocket) { tcpSocket.destroy(); tcpSocket = null; }
-    return { configured: db.prepare('SELECT COUNT(*) AS count FROM app_users').get().count > 0 };
+    return { configured: true };
   });
 
   ipcMain.handle('auth:setup', (_event, input = {}) => {
@@ -222,6 +275,18 @@ function registerAuthHandlers() {
     }
     loginFailures.delete(attemptKey);
     authSession = publicUser(account);
+    return authSession;
+  });
+
+  ipcMain.handle('auth:change-password', (_event, input = {}) => {
+    if (!authSession) throw new Error('سجّل الدخول أولًا.');
+    const password = String(input.password || '');
+    if (password.length < 10) throw new Error('كلمة المرور الجديدة يجب ألا تقل عن 10 أحرف.');
+    const salt = crypto.randomBytes(16).toString('hex');
+    db.prepare('UPDATE app_users SET password_salt=?, password_hash=?, must_change_password=0 WHERE id=?')
+      .run(salt, passwordHash(password, salt), authSession.id);
+    const row = db.prepare('SELECT * FROM app_users WHERE id=?').get(authSession.id);
+    authSession = publicUser(row);
     return authSession;
   });
 
@@ -483,6 +548,7 @@ app.whenReady().then(() => {
   }
 
   openDatabase();
+  seedDefaultAccounts();
   registerAuthHandlers();
 
   // Avoid rebuilding the entire Excel workbook before the window appears.
