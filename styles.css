@@ -162,3 +162,42 @@
  .integrated-main-actions .btn{width:100%}
  .explorer-section-heading{align-items:flex-start;flex-direction:column}
 }
+
+
+/* Windows login and supervisor report workspace */
+html.desktop-auth-required .app-shell{display:none!important}
+.auth-gate{position:fixed;inset:0;z-index:200;display:flex;align-items:center;justify-content:center;padding:20px;background:radial-gradient(circle at top right,#1b3d49 0,#101b24 45%,#0a1219 100%);overflow:auto}
+.auth-gate[hidden],[hidden]{display:none!important}
+.auth-card{width:min(760px,100%);max-height:calc(100vh - 40px);overflow:auto;padding:28px;background:#13212b;border:1px solid #2c424f;border-radius:18px;box-shadow:0 25px 80px #0008;color:#edf5f6}
+.auth-brand{display:flex;align-items:center;gap:13px;padding-bottom:20px;margin-bottom:22px;border-bottom:1px solid #2b414e}
+.auth-brand-mark{width:54px;height:54px;display:grid;place-items:center;border-radius:14px;background:linear-gradient(145deg,#1e8e89,#145d61);color:#fff;font-weight:900;font-size:16px;letter-spacing:-1px}
+.auth-brand strong,.auth-brand small{display:block}
+.auth-brand strong{font-size:17px}
+.auth-brand small{margin-top:4px;color:#8fa6b0;font-size:11px}
+.auth-card h1{margin:0 0 7px;color:#f1f7f8;font-size:22px}
+.auth-description{margin:0 0 20px;color:#9cb0b8;font-size:12px;line-height:1.9}
+.auth-form{display:grid;gap:13px}
+.auth-form label{display:grid;gap:7px;color:#b8c8ce;font-size:11px}
+.auth-form input{width:100%;min-width:0;padding:12px 13px;border:1px solid #334b58;border-radius:9px;background:#0c1720;color:#f1f7f8;font:inherit;font-size:13px;outline:none}
+.auth-form input:focus{border-color:#3bc4b6;box-shadow:0 0 0 3px #26b9ae20}
+.auth-account-section{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:11px;padding:15px;border:1px solid #2c424f;border-radius:12px;background:#101d26}
+.auth-account-section>strong{grid-column:1/-1;color:#65d6c8;font-size:13px;padding-bottom:2px}
+.auth-security-note{margin:2px 0;color:#8da6b0;font-size:10px;line-height:1.8}
+.auth-message{min-height:20px;margin:0;color:#65d6c8;font-size:11px;line-height:1.8}
+.auth-message.is-error{color:#f2a0a0}
+.auth-form button:disabled{opacity:.6;cursor:wait}
+.session-user-name{color:#b7cbd0;font-size:10px;white-space:nowrap}
+.logout-button{padding:8px 11px;font-size:10px;white-space:nowrap}
+.supervisor-report-controls{display:flex;align-items:center;justify-content:space-between;gap:16px;margin-bottom:14px;padding:14px 16px}
+.supervisor-report-controls label{display:flex;align-items:center;gap:12px;color:#aebfc5;font-size:11px}
+.supervisor-report-controls select{min-width:220px;padding:9px 11px;background:#0d1922;border:1px solid #304753;border-radius:8px;color:#edf5f6;font:inherit}
+.supervisor-report-controls small{color:#7e959f;font-size:10px;line-height:1.7}
+@media(max-width:700px){
+  .auth-card{padding:20px}
+  .auth-account-section{grid-template-columns:1fr}
+  .auth-account-section>strong{grid-column:auto}
+  .supervisor-report-controls{align-items:stretch;flex-direction:column}
+  .supervisor-report-controls label{align-items:stretch;flex-direction:column}
+  .supervisor-report-controls select{width:100%;min-width:0}
+  .session-user-name{display:none}
+}
