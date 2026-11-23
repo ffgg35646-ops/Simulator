@@ -132,13 +132,30 @@ function publicUser(row) {
 }
 
 function seedDefaultAccounts() {
-  if (db.prepare('SELECT COUNT(*) AS count FROM app_users').get().count > 0) return false;
-
   const definitions = [
-    { username: 'scale01', displayName: 'مستخدم الميزان الأول', role: 'operator', password: 'Sadat#Scale1201' },
-    { username: 'scale02', displayName: 'مستخدم الميزان الثاني', role: 'operator', password: 'Sadat#Scale1202' },
-    { email: 'supervisor@weighbridge.local', displayName: 'مشرف النظام', role: 'supervisor', password: 'Sadat#Admin120T' }
+    { username: 'user1', displayName: 'المستخدم الأول', role: 'operator', password: 'User@12345' },
+    { username: 'user2', displayName: 'المستخدم الثاني', role: 'operator', password: 'User@12345' },
+    { email: 'admin@weighbridge.com', displayName: 'مشرف النظام', role: 'supervisor', password: 'Admin@12345' }
   ];
+
+  // Migrate only untouched built-in accounts from earlier app versions.
+  // Accounts whose owners already changed their passwords are never overwritten.
+  const legacyDefaults = [
+    { oldIdentifier: 'scale01', next: definitions[0] },
+    { oldIdentifier: 'scale02', next: definitions[1] },
+    { oldIdentifier: 'supervisor@weighbridge.local', next: definitions[2] }
+  ];
+  for (const legacy of legacyDefaults) {
+    const row = db.prepare('SELECT * FROM app_users WHERE username = ? COLLATE NOCASE OR email = ? COLLATE NOCASE')
+      .get(legacy.oldIdentifier, legacy.oldIdentifier);
+    if (!row || !row.must_change_password) continue;
+    const salt = crypto.randomBytes(16).toString('hex');
+    const next = legacy.next;
+    db.prepare('UPDATE app_users SET username=?, email=?, display_name=?, role=?, password_salt=?, password_hash=?, must_change_password=1 WHERE id=?')
+      .run(next.username || null, next.email || null, next.displayName, next.role, salt, passwordHash(next.password, salt), row.id);
+  }
+
+  if (db.prepare('SELECT COUNT(*) AS count FROM app_users').get().count > 0) return false;
   const accounts = definitions.map(definition => {
     const salt = crypto.randomBytes(16).toString('hex');
     return {
