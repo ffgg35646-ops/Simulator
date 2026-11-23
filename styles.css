@@ -203,6 +203,10 @@ html.desktop-auth-required .app-shell{display:none!important}
   .session-user-name{display:none}
 }
 
-/* Make every ticket detail field full width, matching manual weight entry */
-#ticketDetailsFields.form-grid{grid-template-columns:minmax(0,1fr)}
-#ticketDetailsFields.form-grid>label{grid-column:1/-1}
+//* Ticket details: three columns on desktop; weight entry remains full width */
+#ticketDetailsFields.form-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
+#ticketDetailsFields.form-grid>label{grid-column:auto}
+@media(max-width:560px){
+  #ticketDetailsFields.form-grid{grid-template-columns:minmax(0,1fr)}
+  #ticketDetailsFields.form-grid>label{grid-column:auto}
+}
