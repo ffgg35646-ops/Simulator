@@ -126,9 +126,15 @@ function publicUser(row) {
 }
 
 function registerAuthHandlers() {
-  ipcMain.handle('auth:status', () => ({
-    configured: db.prepare('SELECT COUNT(*) AS count FROM app_users').get().count > 0
-  }));
+  ipcMain.handle('auth:status', async () => {
+    authSession = null;
+    if (serialDevice?.isOpen) {
+      await new Promise(resolve => serialDevice.close(() => resolve()));
+      serialDevice = null;
+    }
+    if (tcpSocket) { tcpSocket.destroy(); tcpSocket = null; }
+    return { configured: db.prepare('SELECT COUNT(*) AS count FROM app_users').get().count > 0 };
+  });
 
   ipcMain.handle('auth:setup', (_event, input = {}) => {
     const accountCount = db.prepare('SELECT COUNT(*) AS count FROM app_users').get().count;
