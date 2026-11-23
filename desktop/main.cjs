@@ -257,11 +257,11 @@ function makeExcelWorkbook(records) {
     'قراءة الميزان الأصلية الأولى (كجم)', 'الوزن المعتمد الأول (كجم)', 'فرق تعديل الأولى (كجم)',
     'قراءة الميزان الأصلية الثانية (كجم)', 'الوزن المعتمد الثاني (كجم)', 'فرق تعديل الثانية (كجم)',
     'صافي الحمولة المعتمد (كجم)', 'مصدر الوزنة الأولى', 'مصدر الوزنة الثانية',
-    'وقت الوزنة الأولى', 'وقت الوزنة الثانية', 'تاريخ إنشاء التذكرة'
+    'وقت الوزنة الأولى', 'وقت الوزنة الثانية', 'تاريخ إنشاء التذكرة', 'المستخدم المسجل'
   ];
   const detailHeaders = [
     'رقم التذكرة', 'نوع الحركة', 'رقم السيارة', 'رقم المقطورة', 'اسم السائق', 'اسم العميل', 'اسم الشحنة', 'المحافظة',
-    'الوزنة', 'القراءة الأصلية (كجم)', 'الوزن المعتمد (كجم)', 'فرق التعديل (كجم)', 'مصدر الوزن', 'وقت التسجيل'
+    'الوزنة', 'القراءة الأصلية (كجم)', 'الوزن المعتمد (كجم)', 'فرق التعديل (كجم)', 'مصدر الوزن', 'وقت التسجيل', 'المستخدم المسجل'
   ];
   const valueOf = (record, originalKey, approvedKey) => {
     if (Object.prototype.hasOwnProperty.call(record, originalKey)) return record[originalKey];
@@ -278,7 +278,7 @@ function makeExcelWorkbook(records) {
       firstRaw == null ? 'إدخال يدوي' : firstRaw, r.firstWeight ?? '', adjustment(firstRaw, r.firstWeight),
       secondRaw == null ? 'إدخال يدوي' : secondRaw, r.secondWeight ?? '', adjustment(secondRaw, r.secondWeight),
       r.netWeight ?? '', r.firstSource || r.source || '', r.secondSource || r.source || '',
-      r.firstTime || '', r.secondTime || '', r.createdAt || ''
+      r.firstTime || '', r.secondTime || '', r.createdAt || '', r.createdByUserName || ''
     ];
   });
   const detailRows = [];
@@ -291,16 +291,16 @@ function makeExcelWorkbook(records) {
         r.id || '', r.movementType || '—', r.plate || '', r.trailer || '—', r.driver || '', r.customer || '', r.shipment || '—', r.governorate || '—',
         item.label, item.raw == null ? 'إدخال يدوي' : item.raw,
         item.approved ?? '', adjustment(item.raw, item.approved),
-        item.source || '', item.time || ''
+        item.source || '', item.time || '', r.createdByUserName || ''
       ]);
     }
   }
   const tickets = XLSX.utils.aoa_to_sheet([headers, ...ticketRows]);
-  tickets['!cols'] = [22,14,18,18,20,24,22,18,25,22,20,25,22,20,23,24,24,24,24,24].map(wch => ({ wch }));
-  tickets['!autofilter'] = { ref: `A1:T${Math.max(1, ticketRows.length + 1)}` };
+  tickets['!cols'] = [22,14,18,18,20,24,22,18,25,22,20,25,22,20,23,24,24,24,24,24,22].map(wch => ({ wch }));
+  tickets['!autofilter'] = { ref: `A1:U${Math.max(1, ticketRows.length + 1)}` };
   const details = XLSX.utils.aoa_to_sheet([detailHeaders, ...detailRows]);
-  details['!cols'] = [22,14,18,18,20,24,22,18,14,23,22,20,24,24].map(wch => ({ wch }));
-  details['!autofilter'] = { ref: `A1:N${Math.max(1, detailRows.length + 1)}` };
+  details['!cols'] = [22,14,18,18,20,24,22,18,14,23,22,20,24,24,22].map(wch => ({ wch }));
+  details['!autofilter'] = { ref: `A1:O${Math.max(1, detailRows.length + 1)}` };
   const workbook = XLSX.utils.book_new();
   XLSX.utils.book_append_sheet(workbook, tickets, 'سجل الوزن');
   XLSX.utils.book_append_sheet(workbook, details, 'تفاصيل الوزنتين');
