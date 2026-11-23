@@ -3,8 +3,8 @@ const { contextBridge, ipcRenderer } = require('electron');
 contextBridge.exposeInMainWorld('desktopBridge', {
   isDesktop: true,
   getAuthStatus: () => ipcRenderer.invoke('auth:status'),
-  setupAccounts: input => ipcRenderer.invoke('auth:setup', input),
   login: input => ipcRenderer.invoke('auth:login', input),
+  changePassword: input => ipcRenderer.invoke('auth:change-password', input),
   listUsers: () => ipcRenderer.invoke('auth:users'),
   logout: () => ipcRenderer.invoke('auth:logout'),
   nextTicketId: () => ipcRenderer.sendSync('tickets:next-id'),
