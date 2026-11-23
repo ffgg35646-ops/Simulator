@@ -1293,23 +1293,30 @@
     showToast('تم تنزيل ملف Excel للتذكرة ' + record.id);
   }
 
+  function getReportExportRecords() {
+    if (activeUser?.role !== 'supervisor') return records.slice();
+    const ownerFilter = $('supervisorReportFilter')?.value || 'all';
+    return ownerFilter === 'all' ? records.slice() : records.filter(record => record.createdByUserId === ownerFilter);
+  }
+
   async function exportExcel() {
-    if (!records.length) { showToast('لا توجد عمليات لتصديرها'); return; }
+    const exportRecords = getReportExportRecords();
+    if (!exportRecords.length) { showToast('لا توجد عمليات لتصديرها'); return; }
     if (desktop && window.desktopBridge?.exportExcel) {
       try {
-        const result = await window.desktopBridge.exportExcel(records);
+        const result = await window.desktopBridge.exportExcel(exportRecords);
         if (!result.canceled) showToast('تم تصدير ملف Excel إلى: ' + result.path);
       } catch (error) { showToast('تعذر تصدير Excel: ' + error.message); }
       return;
     }
     if (!window.XLSX) {
-      const rows = records.slice().reverse().map(excelRowForRecord);
+      const rows = exportRecords.slice().reverse().map(excelRowForRecord);
       const blob = buildExcelWorkbookBlob(rows, 'سجل الوزن');
       downloadExcelBlob(blob, 'Weighbridge-120T-Records-' + dateKey(now()) + '.xlsx');
       showToast('تم تنزيل ملف Excel بنجاح');
       return;
     }
-    const rows = records.slice().reverse().map(excelRowForRecord);
+    const rows = exportRecords.slice().reverse().map(excelRowForRecord);
     const sheet = XLSX.utils.json_to_sheet(rows);
     sheet['!cols'] = Object.keys(rows[0]).map(() => ({ wch: 23 }));
     const book = XLSX.utils.book_new();
@@ -1319,9 +1326,10 @@
   }
 
   function exportCSV() {
-    if(!records.length){showToast('لا توجد عمليات لتصديرها');return;}
-    const header=['رقم التذكرة','نوع الحركة','رقم السيارة','رقم المقطورة','اسم العميل','اسم السائق','اسم الشحنة','المحافظة','الوزنة الأولى كجم','الوزنة الثانية كجم','الوزن الصافي كجم','التاريخ'];
-    const lines=[header,...records.map(r=>[r.id,r.movementType || '—',r.plate,r.trailer || '—',r.customer,r.driver,r.shipment || '—',r.governorate || '—',r.firstWeight,r.secondWeight,r.netWeight,stamp(new Date(r.createdAt))])];
+    const exportRecords = getReportExportRecords();
+    if(!exportRecords.length){showToast('لا توجد عمليات لتصديرها');return;}
+    const header=['رقم التذكرة','المستخدم','نوع الحركة','رقم السيارة','رقم المقطورة','اسم العميل','اسم السائق','اسم الشحنة','المحافظة','الوزنة الأولى كجم','الوزنة الثانية كجم','الوزن الصافي كجم','التاريخ'];
+    const lines=[header,...exportRecords.map(r=>[r.id,r.createdByUserName || '',r.movementType || '—',r.plate,r.trailer || '—',r.customer,r.driver,r.shipment || '—',r.governorate || '—',r.firstWeight,r.secondWeight,r.netWeight,stamp(new Date(r.createdAt))])];
     const csv='\uFEFF'+lines.map(row=>row.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\r\n');
     const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
     const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='weighbridge-records.csv';a.click();URL.revokeObjectURL(url);
@@ -1385,6 +1393,12 @@
     }
     if (!status) {
       target.textContent = 'جارٍ تجهيز ملف Excel المرتبط...';
+      return;
+    }
+    if (activeUser?.role === 'operator') {
+      target.textContent = 'يتم حفظ سجلات حسابك تلقائيًا. ملف Excel الشامل متاح للمشرف.';
+      target.classList.remove('is-error');
+      target.title = '';
       return;
     }
     target.textContent = status.ok
@@ -1737,6 +1751,7 @@
       });
       $('authIdentifier').value = $('setupUser1Username').value.trim();
       $('authPassword').value = '';
+      ['setupUser1Password','setupUser1Confirm','setupUser2Password','setupUser2Confirm','setupSupervisorPassword','setupSupervisorConfirm'].forEach(id => { $(id).value = ''; });
       setAuthPanel('login');
       setAuthMessage('login', 'تم إنشاء الحسابات الثلاثة. سجّل الدخول بحسابك.', false);
     } catch (error) {
@@ -1773,6 +1788,9 @@
     activeRecord = null;
     firstCapture = null;
     secondCapture = null;
+    activeTicketDetails = null;
+    rawScaleWeight = null;
+    activeWeightSource = 'waiting';
     $('ticketModal').classList.remove('open');
     $('sessionUserName').hidden = true;
     $('logoutButton').hidden = true;
