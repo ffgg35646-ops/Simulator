@@ -56,7 +56,13 @@
   function now() { return new Date(); }
   function stamp(date = now()) { return date.toLocaleString('ar-EG', { dateStyle: 'short', timeStyle: 'short' }); }
   function dateKey(date) { return date.toISOString().slice(0,10); }
-  function ticketNo() { return 'WB-' + now().getFullYear() + '-' + String(Date.now()).slice(-6); }
+  function ticketNo() {
+    let id;
+    do {
+      id = String(Math.floor(100 + Math.random() * 9900));
+    } while (records.some(record => String(record.id) === id));
+    return id;
+  }
   function showToast(message) {
     const toast = $('toast'); toast.textContent = message; toast.classList.add('show');
     clearTimeout(toastTimer); toastTimer = setTimeout(() => toast.classList.remove('show'), 2800);
@@ -189,7 +195,7 @@
     $('ticketModal').classList.add('open');
   }
   function ticketMarkup(r) {
-    return '<div class="ticket-paper"><div class="ticket-brand"><h2>WEIGHBRIDGE 120T</h2><p>تذكرة وزن شاحنة · Truck Weighing Ticket</p></div><div class="ticket-number">رقم التذكرة: ' + esc(r.id) + '</div>' +
+    return '<div class="ticket-paper"><div class="ticket-location">مدينة السادات<br>المدفن الصحي</div><div class="ticket-number">رقم التذكرة: ' + esc(r.id) + '</div>' +
       '<div class="ticket-top-grid">' +
       ticketField('اسم العميل',r.customer) + ticketField('اسم السائق',r.driver) + ticketField('نوع الحركة',r.movementType || '—') +
       ticketField('رقم السيارة',r.plate) + ticketField('رقم المقطورة',r.trailer || '—') + ticketField('المحافظة',r.governorate || '—') +
