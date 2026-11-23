@@ -3,6 +3,11 @@
   const STORAGE_KEY = 'weighbridge120t.records.v1';
   const SETTINGS_KEY = 'weighbridge120t.settings.v1';
   const CAPACITY = 500000;
+  const desktop = window.desktopBridge && window.desktopBridge.isDesktop;
+  let activeUser = null;
+  let startSerialMonitoring = null;
+  let stopSerialMonitoring = null;
+  let serialMonitorTimer = null;
   let records = readJSON(STORAGE_KEY, []);
   let settings = readJSON(SETTINGS_KEY, { systemName: 'Weighbridge 120T' });
   let liveWeight = 0;
@@ -27,7 +32,6 @@
   let autoRetryAt = 0;
   let lastPortsSignature = null;
 
-  const desktop = window.desktopBridge && window.desktopBridge.isDesktop;
   const DEVICE_EXPLORER_KEY = 'weighbridge120t.deviceExplorer.v1';
   const savedDeviceExplorer = readJSON(DEVICE_EXPLORER_KEY, {});
   let deviceExplorerPorts = Array.isArray(savedDeviceExplorer.ports) ? savedDeviceExplorer.ports : [];
@@ -57,6 +61,10 @@
   function stamp(date = now()) { return date.toLocaleString('ar-EG', { dateStyle: 'short', timeStyle: 'short' }); }
   function dateKey(date) { return date.toISOString().slice(0,10); }
   function ticketNo() {
+    if (desktop && window.desktopBridge?.nextTicketId) {
+      const nextId = window.desktopBridge.nextTicketId();
+      if (nextId) return String(nextId);
+    }
     let id;
     do {
       id = String(Math.floor(100 + Math.random() * 9900));
@@ -134,7 +142,11 @@
         firstAdjusted: firstCapture.adjusted, secondAdjusted: secondCapture.adjusted,
         firstSource: firstCapture.source, secondSource: secondCapture.source,
         netWeight: net, firstTime: firstCapture.time, secondTime: secondCapture.time,
-        createdAt: now().toISOString(), source: [firstCapture.source, secondCapture.source].every(s => s === 'serial') ? 'RS232 / USB Serial' : [firstCapture.source, secondCapture.source].every(s => s === 'manual') ? 'إدخال يدوي' : 'مختلط: قراءة ميزان / إدخال يدوي'
+        createdAt: now().toISOString(),
+        createdByUserId: activeUser?.id || null,
+        createdByUserName: activeUser?.displayName || '',
+        createdByUsername: activeUser?.username || '',
+        source: [firstCapture.source, secondCapture.source].every(s => s === 'serial') ? 'RS232 / USB Serial' : [firstCapture.source, secondCapture.source].every(s => s === 'manual') ? 'إدخال يدوي' : 'مختلط: قراءة ميزان / إدخال يدوي'
       };
       records.unshift(record); activeRecord = record; saveRecords();
       $('formMessage').textContent = 'اكتملت عملية الوزن وحُفظت التذكرة بنجاح.';
@@ -529,24 +541,30 @@
 
   function rowMarkup(r, detailed = false) {
     const movement = esc(r.movementType || '—');
+    const ownerCell = activeUser?.role === 'supervisor'
+      ? '<td>'+esc(r.createdByUserName || 'غير محدد')+'</td>'
+      : '';
+    const deleteAction = activeUser?.role === 'supervisor'
+      ? ''
+      : '<button class="table-action delete-row-action" data-delete-record="'+esc(r.id)+'">حذف</button>';
     const cells = detailed
-      ? '<td><strong>'+esc(r.id)+'</strong></td><td>'+movement+'</td><td>'+esc(r.plate)+'</td><td>'+esc(r.trailer || '—')+'</td>' +
+      ? '<td><strong>'+esc(r.id)+'</strong></td>' + ownerCell + '<td>'+movement+'</td><td>'+esc(r.plate)+'</td><td>'+esc(r.trailer || '—')+'</td>' +
         '<td>'+esc(r.driver)+'</td><td>'+esc(r.customer)+'</td><td>'+esc(r.shipment || '—')+'</td><td>'+esc(r.governorate || '—')+'</td>' +
         '<td>'+fmt(r.firstWeight)+'</td><td>'+fmt(r.secondWeight)+'</td><td><strong class="net-cell">'+fmt(r.netWeight)+'</strong></td><td>'+stamp(new Date(r.createdAt))+'</td>' +
-        '<td><div class="table-actions"><button class="table-action" data-ticket="'+esc(r.id)+'">التذكرة</button><button class="table-action" data-export-ticket="'+esc(r.id)+'">تصدير Excel</button><button class="table-action delete-row-action" data-delete-record="'+esc(r.id)+'">حذف</button></div></td>'
+        '<td><div class="table-actions"><button class="table-action" data-ticket="'+esc(r.id)+'">التذكرة</button><button class="table-action" data-export-ticket="'+esc(r.id)+'">تصدير Excel</button>'+deleteAction+'</div></td>'
       : '<td><strong>'+esc(r.id)+'</strong></td><td>'+movement+'</td><td>'+esc(r.plate)+'</td><td>'+esc(r.trailer || '—')+'</td>' +
         '<td>'+esc(r.customer)+'</td><td>'+esc(r.driver)+'</td><td>'+esc(r.shipment || '—')+'</td><td><strong class="net-cell">'+fmt(r.netWeight)+'</strong></td><td>'+stamp(new Date(r.createdAt))+'</td>' +
         '<td><button class="table-action" data-export-ticket="'+esc(r.id)+'">تصدير ملف Excel</button></td>';
     return '<tr>'+cells+'</tr>';
   }
-  function searchRecords(query) {
+  function searchRecords(query, sourceRecords = records) {
     const q = String(query || '').trim().toLocaleLowerCase('ar');
-    if (!q) return records.slice();
-    return records.filter(r => {
+    if (!q) return sourceRecords.slice();
+    return sourceRecords.filter(r => {
       const values = [
         r.id, r.movementType, r.plate, r.trailer, r.driver, r.customer, r.shipment, r.governorate, r.source, r.firstSource, r.secondSource,
         r.firstWeight, r.secondWeight, r.netWeight, r.firstOriginalWeight, r.secondOriginalWeight,
-        r.createdAt, r.firstTime, r.secondTime,
+        r.createdAt, r.firstTime, r.secondTime, r.createdByUserName, r.createdByUsername,
         r.createdAt ? stamp(new Date(r.createdAt)) : '',
         r.firstTime ? stamp(new Date(r.firstTime)) : '',
         r.secondTime ? stamp(new Date(r.secondTime)) : ''
@@ -569,7 +587,7 @@
   function deleteAllRecords() {
     if (!records.length) { showToast('لا توجد سجلات لحذفها'); return; }
     const count = records.length;
-    if (!confirm('تحذير: سيتم حذف جميع سجلات الوزن (' + count + ' عملية) نهائيًا من البرنامج وملف Excel. هل تريد المتابعة؟')) return;
+    if (!confirm('تحذير: سيتم حذف سجلات هذا المستخدم فقط (' + count + ' عملية) نهائيًا. هل تريد المتابعة؟')) return;
     records = [];
     activeRecord = null;
     $('ticketModal').classList.remove('open');
@@ -617,17 +635,22 @@
     $('vehiclesTable').innerHTML = vehicles.length ? vehicles.map(v=>'<tr><td>'+esc(v.plate)+'</td><td>'+esc(v.driver)+'</td><td>'+esc(v.customer)+'</td><td>'+fmt(v.count)+'</td><td>'+fmt(v.net)+' كجم</td></tr>').join('') : '<tr class="empty-row"><td colspan="5">لا توجد بيانات بعد</td></tr>';
   }
   function renderReports() {
-    const filtered = searchRecords($('reportSearch')?.value || '');
+    const ownerFilter = activeUser?.role === 'supervisor' ? ($('supervisorReportFilter')?.value || 'all') : 'all';
+    const reportSource = ownerFilter === 'all'
+      ? records
+      : records.filter(record => record.createdByUserId === ownerFilter);
+    const filtered = searchRecords($('reportSearch')?.value || '', reportSource);
     const total = filtered.reduce((s,r)=>s+r.netWeight,0);
     $('reportCount').textContent = fmt(filtered.length);
     $('reportNet').textContent = fmt(total)+' كجم';
     $('reportAverage').textContent = fmt(filtered.length ? Math.round(total/filtered.length) : 0)+' كجم';
-    $('reportResultCount').textContent = fmt(filtered.length) + ' نتيجة من أصل ' + fmt(records.length) + ' عملية';
+    $('reportResultCount').textContent = fmt(filtered.length) + ' نتيجة من أصل ' + fmt(reportSource.length) + ' عملية';
     const days = Array.from({length:7},(_,i)=>{const d=new Date();d.setDate(d.getDate()-(6-i));return d;});
     const counts = days.map(d=>filtered.filter(r=>dateKey(new Date(r.createdAt))===dateKey(d)).length);
     const max = Math.max(1,...counts);
-    $('weeklyChart').innerHTML = filtered.length ? days.map((d,i)=>'<div class="chart-column"><div class="chart-bar" style="height:'+Math.max(4,counts[i]/max*125)+'px"><span>'+counts[i]+'</span></div><small>'+d.toLocaleDateString('ar-EG',{weekday:'short'})+'</small></div>').join('') : '<div class="chart-empty">'+(records.length ? 'لا توجد سجلات مطابقة للبحث.' : 'ستظهر الإحصائيات بعد تسجيل عمليات الوزن.')+'</div>';
-    $('reportRecordsTable').innerHTML = filtered.length ? filtered.map(r=>rowMarkup(r,true)).join('') : '<tr class="empty-row"><td colspan="9">'+(records.length ? 'لا توجد نتائج مطابقة للبحث' : 'لا توجد عمليات مسجلة')+'</td></tr>';
+    $('weeklyChart').innerHTML = filtered.length ? days.map((d,i)=>'<div class="chart-column"><div class="chart-bar" style="height:'+Math.max(4,counts[i]/max*125)+'px"><span>'+counts[i]+'</span></div><small>'+d.toLocaleDateString('ar-EG',{weekday:'short'})+'</small></div>').join('') : '<div class="chart-empty">'+(reportSource.length ? 'لا توجد سجلات مطابقة للبحث.' : 'ستظهر الإحصائيات بعد تسجيل عمليات الوزن.')+'</div>';
+    const emptyColumns = activeUser?.role === 'supervisor' ? 14 : 13;
+    $('reportRecordsTable').innerHTML = filtered.length ? filtered.map(r=>rowMarkup(r,true)).join('') : '<tr class="empty-row"><td colspan="'+emptyColumns+'">'+(reportSource.length ? 'لا توجد نتائج مطابقة للبحث' : 'لا توجد عمليات مسجلة')+'</td></tr>';
   }
   function switchView(name) {
     document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active',v.id==='view-'+name));
@@ -1531,8 +1554,18 @@
       renderAll();
     });
 
-    refreshPorts(true);
-    setInterval(() => refreshPorts(false), 2000);
+    startSerialMonitoring = () => {
+      autoDetectionEnabled = true;
+      if (!serialMonitorTimer) {
+        refreshPorts(true);
+        serialMonitorTimer = setInterval(() => refreshPorts(false), 2000);
+      }
+    };
+    stopSerialMonitoring = () => {
+      autoDetectionEnabled = false;
+      if (serialMonitorTimer) clearInterval(serialMonitorTimer);
+      serialMonitorTimer = null;
+    };
   } else {
     $('serialDevice').disabled = true;
     $('refreshSerialPorts').disabled = true;
@@ -1598,5 +1631,158 @@
   $('clearData').addEventListener('click',deleteAllRecords);
   $('systemName').value=settings.systemName||'Weighbridge 120T';
   renderDeviceExplorer();
+
+  function setAuthPanel(name) {
+    $('authLoginPanel').hidden = name !== 'login';
+    $('authSetupPanel').hidden = name !== 'setup';
+    $('authLoginMessage').textContent = '';
+    $('authSetupMessage').textContent = '';
+    if (name === 'login') setTimeout(() => $('authIdentifier').focus(), 0);
+    if (name === 'setup') setTimeout(() => $('setupUser1Name').focus(), 0);
+  }
+
+  function setAuthMessage(panel, message, isError = true) {
+    const target = panel === 'setup' ? $('authSetupMessage') : $('authLoginMessage');
+    target.textContent = message;
+    target.classList.toggle('is-error', isError);
+  }
+
+  async function populateSupervisorUsers() {
+    if (activeUser?.role !== 'supervisor') return;
+    try {
+      const users = await window.desktopBridge.listUsers();
+      const select = $('supervisorReportFilter');
+      select.innerHTML = '<option value="all">كل المستخدمين</option>';
+      users.forEach(user => {
+        const option = document.createElement('option');
+        option.value = user.id;
+        option.textContent = user.displayName + ' (' + user.username + ')';
+        select.appendChild(option);
+      });
+      renderReports();
+    } catch (error) {
+      showToast('تعذر تحميل قائمة المستخدمين: ' + error.message);
+    }
+  }
+
+  function configureRoleUI() {
+    const isSupervisor = activeUser?.role === 'supervisor';
+    document.querySelectorAll('.nav-link').forEach(button => {
+      button.hidden = isSupervisor && button.dataset.view !== 'reports';
+    });
+    document.querySelectorAll('.view').forEach(view => {
+      view.hidden = isSupervisor && view.id !== 'view-reports';
+    });
+    $('supervisorReportControls').hidden = !isSupervisor;
+    $('reportUserHeader').hidden = !isSupervisor;
+    $('openExcelFile').hidden = !isSupervisor;
+    $('chooseExcelFile').hidden = !isSupervisor;
+    $('clearData').hidden = isSupervisor;
+    document.querySelectorAll('[data-delete-all-records]').forEach(button => { button.hidden = isSupervisor; });
+    $('sessionUserName').textContent = isSupervisor
+      ? 'المشرف: ' + activeUser.displayName
+      : 'المستخدم: ' + activeUser.displayName;
+    $('sessionUserName').hidden = false;
+    $('logoutButton').hidden = false;
+    switchView(isSupervisor ? 'reports' : 'dashboard');
+    if (isSupervisor) populateSupervisorUsers();
+  }
+
+  async function enterAuthenticatedApp(user) {
+    activeUser = user;
+    records = readJSON(STORAGE_KEY, []);
+    $('authGate').hidden = true;
+    document.documentElement.classList.remove('desktop-auth-required');
+    configureRoleUI();
+    renderAll();
+    await refreshExcelSyncStatus();
+    if (user.role === 'operator') startSerialMonitoring?.();
+  }
+
+  async function initializeAuthentication() {
+    if (!desktop) {
+      document.documentElement.classList.remove('desktop-auth-required');
+      $('authGate').hidden = true;
+      return;
+    }
+    $('authGate').hidden = false;
+    try {
+      const status = await window.desktopBridge.getAuthStatus();
+      setAuthPanel(status.configured ? 'login' : 'setup');
+    } catch (error) {
+      setAuthPanel('login');
+      setAuthMessage('login', 'تعذر التحقق من إعداد الحسابات: ' + error.message);
+    }
+  }
+
+  $('authSetupForm').addEventListener('submit', async event => {
+    event.preventDefault();
+    const user1Password = $('setupUser1Password').value;
+    const user2Password = $('setupUser2Password').value;
+    const supervisorPassword = $('setupSupervisorPassword').value;
+    if (user1Password !== $('setupUser1Confirm').value ||
+        user2Password !== $('setupUser2Confirm').value ||
+        supervisorPassword !== $('setupSupervisorConfirm').value) {
+      setAuthMessage('setup', 'تأكيد كلمة المرور غير مطابق.');
+      return;
+    }
+    const submit = $('authSetupSubmit');
+    submit.disabled = true;
+    setAuthMessage('setup', 'جارٍ حفظ الحسابات...', false);
+    try {
+      await window.desktopBridge.setupAccounts({
+        user1: { displayName: $('setupUser1Name').value.trim(), username: $('setupUser1Username').value.trim(), password: user1Password },
+        user2: { displayName: $('setupUser2Name').value.trim(), username: $('setupUser2Username').value.trim(), password: user2Password },
+        supervisor: { displayName: $('setupSupervisorName').value.trim(), email: $('setupSupervisorEmail').value.trim(), password: supervisorPassword }
+      });
+      $('authIdentifier').value = $('setupUser1Username').value.trim();
+      $('authPassword').value = '';
+      setAuthPanel('login');
+      setAuthMessage('login', 'تم إنشاء الحسابات الثلاثة. سجّل الدخول بحسابك.', false);
+    } catch (error) {
+      setAuthMessage('setup', error.message || 'تعذر إنشاء الحسابات.');
+    } finally {
+      submit.disabled = false;
+    }
+  });
+
+  $('authLoginForm').addEventListener('submit', async event => {
+    event.preventDefault();
+    const submit = $('authLoginSubmit');
+    submit.disabled = true;
+    setAuthMessage('login', 'جارٍ التحقق من بيانات الدخول...', false);
+    try {
+      const user = await window.desktopBridge.login({
+        identifier: $('authIdentifier').value.trim(),
+        password: $('authPassword').value
+      });
+      $('authPassword').value = '';
+      await enterAuthenticatedApp(user);
+    } catch (error) {
+      setAuthMessage('login', error.message || 'تعذر تسجيل الدخول.');
+    } finally {
+      submit.disabled = false;
+    }
+  });
+
+  $('logoutButton').addEventListener('click', async () => {
+    try { stopSerialMonitoring?.(); } catch {}
+    try { await window.desktopBridge.logout(); } catch {}
+    activeUser = null;
+    records = [];
+    activeRecord = null;
+    firstCapture = null;
+    secondCapture = null;
+    $('ticketModal').classList.remove('open');
+    $('sessionUserName').hidden = true;
+    $('logoutButton').hidden = true;
+    document.documentElement.classList.add('desktop-auth-required');
+    $('authGate').hidden = false;
+    $('authPassword').value = '';
+    setAuthPanel('login');
+  });
+
+  $('supervisorReportFilter').addEventListener('change', renderReports);
+  initializeAuthentication();
   setWeight(liveWeight);setStability(true);updateCaptureUI();renderAll();
 })();
