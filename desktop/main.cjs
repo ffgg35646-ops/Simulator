@@ -139,7 +139,8 @@ function seedDefaultAccounts() {
       role: 'operator',
       password: 'User@12345'
     })),
-    { email: 'admin@weighbridge.com', displayName: 'مشرف النظام', role: 'supervisor', password: 'Admin@12345' }
+    { email: 'admin@weighbridge.com', displayName: 'مشرف النظام', role: 'supervisor', password: 'Admin@12345' },
+    { username: 'محمد صلاح', displayName: 'محمد صلاح', role: 'operator', password: '1966', mustChangePassword: false }
   ];
 
   // Migrate only untouched built-in accounts from earlier app versions.
@@ -166,7 +167,7 @@ function seedDefaultAccounts() {
       const existing = db.prepare('SELECT id FROM app_users WHERE username = ? COLLATE NOCASE OR email = ? COLLATE NOCASE').get(identifier, identifier);
       if (existing) continue;
       const salt = crypto.randomBytes(16).toString('hex');
-      insertMissing.run(crypto.randomUUID(), definition.username || null, definition.email || null, definition.displayName, definition.role, salt, passwordHash(definition.password, salt), 1);
+      insertMissing.run(crypto.randomUUID(), definition.username || null, definition.email || null, definition.displayName, definition.role, salt, passwordHash(definition.password, salt), definition.mustChangePassword === false ? 0 : 1);
     }
     return true;
   }
@@ -180,7 +181,7 @@ function seedDefaultAccounts() {
       role: definition.role,
       password_salt: salt,
       password_hash: passwordHash(definition.password, salt),
-      must_change_password: 1
+      must_change_password: definition.mustChangePassword === false ? 0 : 1
     };
   });
 
