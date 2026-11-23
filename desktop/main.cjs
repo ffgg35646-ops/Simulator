@@ -133,8 +133,12 @@ function publicUser(row) {
 
 function seedDefaultAccounts() {
   const definitions = [
-    { username: 'user1', displayName: 'المستخدم الأول', role: 'operator', password: 'User@12345' },
-    { username: 'user2', displayName: 'المستخدم الثاني', role: 'operator', password: 'User@12345' },
+    ...Array.from({ length: 10 }, (_, index) => ({
+      username: 'user' + (index + 1),
+      displayName: 'المستخدم ' + (index + 1),
+      role: 'operator',
+      password: 'User@12345'
+    })),
     { email: 'admin@weighbridge.com', displayName: 'مشرف النظام', role: 'supervisor', password: 'Admin@12345' }
   ];
 
@@ -155,7 +159,17 @@ function seedDefaultAccounts() {
       .run(next.username || null, next.email || null, next.displayName, next.role, salt, passwordHash(next.password, salt), row.id);
   }
 
-  if (db.prepare('SELECT COUNT(*) AS count FROM app_users').get().count > 0) return false;
+  if (db.prepare('SELECT COUNT(*) AS count FROM app_users').get().count > 0) {
+    const insertMissing = db.prepare('INSERT INTO app_users(id,username,email,display_name,role,password_salt,password_hash,must_change_password) VALUES(?,?,?,?,?,?,?,?)');
+    for (const definition of definitions) {
+      const identifier = definition.username || definition.email;
+      const existing = db.prepare('SELECT id FROM app_users WHERE username = ? COLLATE NOCASE OR email = ? COLLATE NOCASE').get(identifier, identifier);
+      if (existing) continue;
+      const salt = crypto.randomBytes(16).toString('hex');
+      insertMissing.run(crypto.randomUUID(), definition.username || null, definition.email || null, definition.displayName, definition.role, salt, passwordHash(definition.password, salt), 1);
+    }
+    return true;
+  }
   const accounts = definitions.map(definition => {
     const salt = crypto.randomBytes(16).toString('hex');
     return {
