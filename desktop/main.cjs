@@ -140,7 +140,9 @@ function seedDefaultAccounts() {
       password: 'User@12345'
     })),
     { email: 'admin@weighbridge.com', displayName: 'مشرف النظام', role: 'supervisor', password: 'Admin@12345' },
-    { username: 'محمد صلاح', displayName: 'محمد صلاح', role: 'operator', password: '1966', mustChangePassword: false }
+    { username: 'محمد صلاح', displayName: 'محمد صلاح', role: 'operator', password: '1966', mustChangePassword: false },
+    { username: 'مصطفى', displayName: 'مصطفى', role: 'supervisor', password: '1980', mustChangePassword: false },
+    { username: 'محمد حسين', displayName: 'محمد حسين', role: 'operator', password: '1988', mustChangePassword: false }
   ];
 
   // Migrate only untouched built-in accounts from earlier app versions.
