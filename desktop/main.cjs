@@ -1,6 +1,7 @@
 const { app, BrowserWindow, ipcMain, dialog, session, shell } = require('electron');
 const path = require('node:path');
 const fs = require('node:fs');
+const crypto = require('node:crypto');
 const net = require('node:net');
 const Database = require('better-sqlite3');
 const { SerialPort } = require('serialport');
@@ -8,6 +9,8 @@ const XLSX = require('xlsx');
 const { checkTrialLicense } = require('./license.cjs');
 
 let db;
+let authSession = null;
+const loginFailures = new Map();
 let tcpSocket = null;
 let serialDevice = null;
 let mainWindow;
@@ -31,28 +34,205 @@ function openDatabase() {
       payload TEXT NOT NULL,
       created_at TEXT NOT NULL
     );
+    CREATE TABLE IF NOT EXISTS app_users (
+      id TEXT PRIMARY KEY,
+      username TEXT COLLATE NOCASE UNIQUE,
+      email TEXT COLLATE NOCASE UNIQUE,
+      display_name TEXT NOT NULL,
+      role TEXT NOT NULL CHECK(role IN ('operator','supervisor')),
+      password_salt TEXT NOT NULL,
+      password_hash TEXT NOT NULL,
+      created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
+    );
   `);
   const get = db.prepare('SELECT value FROM app_kv WHERE key = ?');
   const put = db.prepare(`INSERT INTO app_kv(key,value,updated_at) VALUES(?,?,CURRENT_TIMESTAMP)
     ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=CURRENT_TIMESTAMP`);
-  ipcMain.on('local-store:get', (event, key) => { event.returnValue = get.get(String(key))?.value ?? null; });
+  ipcMain.on('local-store:get', (event, key) => {
+    const storeKey = String(key);
+    if (storeKey === RECORDS_KEY) {
+      if (!authSession) { event.returnValue = '[]'; return; }
+      const all = getStoredRecords();
+      const visible = authSession.role === 'supervisor'
+        ? all
+        : all.filter(record => record.createdByUserId === authSession.id);
+      event.returnValue = JSON.stringify(visible);
+      return;
+    }
+    event.returnValue = get.get(storeKey)?.value ?? null;
+  });
   ipcMain.on('local-store:set', (event, key, value) => {
-    put.run(String(key), String(value));
-    if (String(key).includes('records')) {
+    const storeKey = String(key);
+    if (storeKey === RECORDS_KEY) {
+      if (!authSession || authSession.role !== 'operator') { event.returnValue = false; return; }
       try {
-        const rows = JSON.parse(String(value));
+        const requested = JSON.parse(String(value));
+        if (!Array.isArray(requested)) { event.returnValue = false; return; }
+        const ownRows = requested.map(item => ({
+          ...item,
+          createdByUserId: authSession.id,
+          createdByUserName: authSession.displayName,
+          createdByUsername: authSession.username
+        }));
+        const allRows = getStoredRecords();
+        const otherRows = allRows.filter(item => item.createdByUserId !== authSession.id);
+        const merged = [...ownRows, ...otherRows].sort((a, b) =>
+          new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime()
+        );
+        put.run(RECORDS_KEY, JSON.stringify(merged));
         const insert = db.prepare('INSERT OR REPLACE INTO weight_records(id,payload,created_at) VALUES(?,?,?)');
         const tx = db.transaction(items => {
           db.prepare('DELETE FROM weight_records').run();
           for (const item of items) insert.run(String(item.id), JSON.stringify(item), String(item.createdAt || new Date().toISOString()));
         });
-        if (Array.isArray(rows)) {
-          tx(rows);
-          if (String(key) === RECORDS_KEY) syncExcelRecords(rows);
-        }
-      } catch (error) { console.error('Record index update failed:', error); }
+        tx(merged);
+        syncExcelRecords(merged);
+        event.returnValue = true;
+      } catch (error) {
+        console.error('Record save failed:', error);
+        event.returnValue = false;
+      }
+      return;
     }
+    put.run(storeKey, String(value));
     event.returnValue = true;
+  });
+  ipcMain.on('tickets:next-id', event => {
+    if (!authSession || authSession.role !== 'operator') { event.returnValue = null; return; }
+    const existing = new Set(getStoredRecords().map(record => String(record.id)));
+    let candidate = '';
+    for (let attempt = 0; attempt < 20000; attempt++) {
+      candidate = String(crypto.randomInt(100, 10000));
+      if (!existing.has(candidate)) break;
+      candidate = '';
+    }
+    event.returnValue = candidate || String(Date.now()).slice(-4);
+  });
+}
+
+function passwordHash(password, salt) {
+  return crypto.scryptSync(String(password), String(salt), 64).toString('hex');
+}
+
+function publicUser(row) {
+  if (!row) return null;
+  return {
+    id: row.id,
+    username: row.username || '',
+    email: row.email || '',
+    displayName: row.display_name,
+    role: row.role
+  };
+}
+
+function registerAuthHandlers() {
+  ipcMain.handle('auth:status', () => ({
+    configured: db.prepare('SELECT COUNT(*) AS count FROM app_users').get().count > 0
+  }));
+
+  ipcMain.handle('auth:setup', (_event, input = {}) => {
+    const accountCount = db.prepare('SELECT COUNT(*) AS count FROM app_users').get().count;
+    if (accountCount > 0) throw new Error('تم إعداد الحسابات بالفعل. سجّل الدخول.');
+    const user1 = {
+      username: String(input.user1?.username || '').trim(),
+      displayName: String(input.user1?.displayName || '').trim() || 'المستخدم الأول',
+      password: String(input.user1?.password || '')
+    };
+    const user2 = {
+      username: String(input.user2?.username || '').trim(),
+      displayName: String(input.user2?.displayName || '').trim() || 'المستخدم الثاني',
+      password: String(input.user2?.password || '')
+    };
+    const supervisor = {
+      email: String(input.supervisor?.email || '').trim().toLowerCase(),
+      displayName: String(input.supervisor?.displayName || '').trim() || 'المشرف',
+      password: String(input.supervisor?.password || '')
+    };
+    if (user1.username.length < 3 || user2.username.length < 3) throw new Error('اسم المستخدم يجب أن يتكون من 3 أحرف على الأقل.');
+    if (user1.password.length < 8 || user2.password.length < 8 || supervisor.password.length < 8) throw new Error('كل كلمة مرور يجب أن تكون 8 أحرف على الأقل.');
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(supervisor.email)) throw new Error('أدخل بريدًا إلكترونيًا صحيحًا للمشرف.');
+    const identifiers = [user1.username.toLowerCase(), user2.username.toLowerCase(), supervisor.email];
+    if (new Set(identifiers).size !== identifiers.length) throw new Error('أسماء المستخدمين والبريد الإلكتروني يجب أن تكون مختلفة.');
+    const createAccount = (account, role) => {
+      const salt = crypto.randomBytes(16).toString('hex');
+      return {
+        id: crypto.randomUUID(),
+        username: account.username || null,
+        email: account.email || null,
+        display_name: account.displayName,
+        role,
+        password_salt: salt,
+        password_hash: passwordHash(account.password, salt)
+      };
+    };
+    const accounts = [
+      createAccount(user1, 'operator'),
+      createAccount(user2, 'operator'),
+      createAccount(supervisor, 'supervisor')
+    ];
+    const oldRecords = getStoredRecords();
+    const migrated = oldRecords.map(record => record.createdByUserId ? record : ({
+      ...record,
+      createdByUserId: accounts[0].id,
+      createdByUserName: accounts[0].display_name,
+      createdByUsername: accounts[0].username,
+      importedBeforeLogin: true
+    }));
+    const insertAccount = db.prepare('INSERT INTO app_users(id,username,email,display_name,role,password_salt,password_hash) VALUES(?,?,?,?,?,?,?)');
+    const saveRecords = db.prepare(`INSERT INTO app_kv(key,value,updated_at) VALUES(?,?,CURRENT_TIMESTAMP)
+      ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=CURRENT_TIMESTAMP`);
+    const insertRecord = db.prepare('INSERT OR REPLACE INTO weight_records(id,payload,created_at) VALUES(?,?,?)');
+    const tx = db.transaction(() => {
+      for (const account of accounts) {
+        insertAccount.run(account.id, account.username, account.email, account.display_name, account.role, account.password_salt, account.password_hash);
+      }
+      saveRecords.run(RECORDS_KEY, JSON.stringify(migrated));
+      db.prepare('DELETE FROM weight_records').run();
+      for (const record of migrated) insertRecord.run(String(record.id), JSON.stringify(record), String(record.createdAt || new Date().toISOString()));
+    });
+    tx();
+    syncExcelRecords(migrated);
+    return { configured: true, accountsCreated: 3 };
+  });
+
+  ipcMain.handle('auth:login', (_event, input = {}) => {
+    const identifier = String(input.identifier || '').trim();
+    const password = String(input.password || '');
+    const attemptKey = identifier.toLowerCase();
+    const attempts = loginFailures.get(attemptKey);
+    if (attempts && attempts.lockedUntil > Date.now()) {
+      const seconds = Math.ceil((attempts.lockedUntil - Date.now()) / 1000);
+      throw new Error('محاولات كثيرة غير صحيحة. حاول بعد ' + seconds + ' ثانية.');
+    }
+    const account = db.prepare('SELECT * FROM app_users WHERE username = ? COLLATE NOCASE OR email = ? COLLATE NOCASE').get(identifier, identifier);
+    const supplied = passwordHash(password, account?.password_salt || 'unknown-account-salt');
+    const expected = account?.password_hash || '0'.repeat(128);
+    const valid = Boolean(account) && crypto.timingSafeEqual(Buffer.from(supplied, 'hex'), Buffer.from(expected, 'hex'));
+    if (!valid) {
+      const next = { count: (attempts?.count || 0) + 1, lockedUntil: 0 };
+      if (next.count >= 5) { next.count = 0; next.lockedUntil = Date.now() + 60000; }
+      loginFailures.set(attemptKey, next);
+      throw new Error('اسم المستخدم أو كلمة المرور غير صحيحة.');
+    }
+    loginFailures.delete(attemptKey);
+    authSession = publicUser(account);
+    return authSession;
+  });
+
+  ipcMain.handle('auth:users', () => {
+    if (!authSession || authSession.role !== 'supervisor') throw new Error('هذه القائمة متاحة للمشرف فقط.');
+    return db.prepare("SELECT id,username,display_name FROM app_users WHERE role='operator' ORDER BY created_at,id")
+      .all().map(row => ({ id: row.id, username: row.username, displayName: row.display_name }));
+  });
+
+  ipcMain.handle('auth:logout', async () => {
+    authSession = null;
+    if (serialDevice?.isOpen) {
+      await new Promise(resolve => serialDevice.close(() => resolve()));
+      serialDevice = null;
+    }
+    if (tcpSocket) { tcpSocket.destroy(); tcpSocket = null; }
+    return true;
   });
 }
 
@@ -148,7 +328,12 @@ function syncExcelRecords(records) {
     excelSyncState = { ok: false, path: currentExcelPath(), count: Array.isArray(records) ? records.length : 0, error: error?.message || String(error) };
     console.error('Excel sync failed:', error);
   }
-  if (mainWindow && !mainWindow.isDestroyed()) mainWindow.webContents.send('excel:sync-status', excelSyncState);
+  if (mainWindow && !mainWindow.isDestroyed()) {
+    const visibleStatus = authSession?.role === 'supervisor'
+      ? excelSyncState
+      : { ...excelSyncState, path: '', count: getStoredRecords().filter(record => record.createdByUserId === authSession?.id).length };
+    mainWindow.webContents.send('excel:sync-status', visibleStatus);
+  }
   return { ...excelSyncState };
 }
 
@@ -172,8 +357,15 @@ function createWindow() {
   mainWindow.webContents.setWindowOpenHandler(() => ({ action: 'deny' }));
 }
 
-ipcMain.handle('excel:status', () => ({ ...excelSyncState, path: currentExcelPath() }));
+ipcMain.handle('excel:status', () => {
+  if (!authSession) throw new Error('سجّل الدخول أولًا.');
+  if (authSession.role !== 'supervisor') {
+    return { ok: excelSyncState.ok, path: '', count: getStoredRecords().filter(record => record.createdByUserId === authSession.id).length };
+  }
+  return { ...excelSyncState, path: currentExcelPath() };
+});
 ipcMain.handle('excel:choose-file', async () => {
+  if (!authSession || authSession.role !== 'supervisor') throw new Error('تغيير ملف Excel متاح للمشرف فقط.');
   const result = await dialog.showSaveDialog(mainWindow, {
     title: 'اختيار ملف Excel المرتبط',
     buttonLabel: 'ربط ملف Excel',
@@ -186,6 +378,7 @@ ipcMain.handle('excel:choose-file', async () => {
   return { canceled: false, ...syncExcelRecords(getStoredRecords()) };
 });
 ipcMain.handle('excel:open-file', async () => {
+  if (!authSession || authSession.role !== 'supervisor') throw new Error('فتح ملف Excel الشامل متاح للمشرف فقط.');
   const status = syncExcelRecords(getStoredRecords());
   if (!status.ok) throw new Error(status.error || 'تعذر تحديث ملف Excel.');
   const openError = await shell.openPath(status.path);
@@ -193,6 +386,15 @@ ipcMain.handle('excel:open-file', async () => {
   return { path: status.path };
 });
 ipcMain.handle('excel:export', async (_event, rendererRecords, options = {}) => {
+  if (!authSession) throw new Error('سجّل الدخول أولًا.');
+  const allRecords = getStoredRecords();
+  const allowedRecords = authSession.role === 'supervisor'
+    ? allRecords
+    : allRecords.filter(record => record.createdByUserId === authSession.id);
+  const requestedIds = Array.isArray(rendererRecords) && rendererRecords.length
+    ? new Set(rendererRecords.map(record => String(record.id)))
+    : null;
+  const safeRecords = requestedIds ? allowedRecords.filter(record => requestedIds.has(String(record.id))) : allowedRecords;
   const requestedName = String(options?.fileName || '').trim()
     .replace(/[<>:"/\\|?*\x00-\x1F]/g, '-')
     .replace(/\.xlsx$/i, '');
@@ -205,7 +407,8 @@ ipcMain.handle('excel:export', async (_event, rendererRecords, options = {}) => 
   });
   if (result.canceled || !result.filePath) return { canceled: true };
   const targetPath = result.filePath.toLowerCase().endsWith('.xlsx') ? result.filePath : result.filePath + '.xlsx';
-  const rows = Array.isArray(rendererRecords) ? rendererRecords : getStoredRecords();
+  const rows = safeRecords;
+  if (!rows.length) throw new Error('لا توجد سجلات مسموح بتصديرها لهذا الحساب.');
   const savedPath = writeExcelFile(rows, targetPath);
   if (options?.openAfterExport) {
     const openError = await shell.openPath(savedPath);
@@ -274,6 +477,7 @@ app.whenReady().then(() => {
   }
 
   openDatabase();
+  registerAuthHandlers();
 
   // Avoid rebuilding the entire Excel workbook before the window appears.
   const initialRecords = getStoredRecords();
