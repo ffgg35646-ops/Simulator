@@ -2,6 +2,12 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('desktopBridge', {
   isDesktop: true,
+  getAuthStatus: () => ipcRenderer.invoke('auth:status'),
+  setupAccounts: input => ipcRenderer.invoke('auth:setup', input),
+  login: input => ipcRenderer.invoke('auth:login', input),
+  listUsers: () => ipcRenderer.invoke('auth:users'),
+  logout: () => ipcRenderer.invoke('auth:logout'),
+  nextTicketId: () => ipcRenderer.sendSync('tickets:next-id'),
   getItem: key => ipcRenderer.sendSync('local-store:get', key),
   setItem: (key, value) => ipcRenderer.sendSync('local-store:set', key, value),
   getExcelStatus: () => ipcRenderer.invoke('excel:status'),
