@@ -201,3 +201,7 @@ html.desktop-auth-required .app-shell{display:none!important}
   .supervisor-report-controls select{width:100%;min-width:0}
   .session-user-name{display:none}
 }
+
+/* Make every ticket detail field full width, matching manual weight entry */
+#ticketDetailsFields.form-grid{grid-template-columns:minmax(0,1fr)}
+#ticketDetailsFields.form-grid>label{grid-column:1/-1}
