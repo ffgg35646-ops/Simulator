@@ -1649,15 +1649,15 @@
 
   function setAuthPanel(name) {
     $('authLoginPanel').hidden = name !== 'login';
-    $('authSetupPanel').hidden = name !== 'setup';
+    $('authChangePanel').hidden = name !== 'change';
     $('authLoginMessage').textContent = '';
-    $('authSetupMessage').textContent = '';
+    $('authChangeMessage').textContent = '';
     if (name === 'login') setTimeout(() => $('authIdentifier').focus(), 0);
-    if (name === 'setup') setTimeout(() => $('setupUser1Name').focus(), 0);
+    if (name === 'change') setTimeout(() => $('authNewPassword').focus(), 0);
   }
 
   function setAuthMessage(panel, message, isError = true) {
-    const target = panel === 'setup' ? $('authSetupMessage') : $('authLoginMessage');
+    const target = panel === 'change' ? $('authChangeMessage') : $('authLoginMessage');
     target.textContent = message;
     target.classList.toggle('is-error', isError);
   }
@@ -1705,6 +1705,11 @@
 
   async function enterAuthenticatedApp(user) {
     activeUser = user;
+    if (user.mustChangePassword) {
+      $('authGate').hidden = false;
+      setAuthPanel('change');
+      return;
+    }
     records = readJSON(STORAGE_KEY, []);
     $('authGate').hidden = true;
     document.documentElement.classList.remove('desktop-auth-required');
@@ -1722,45 +1727,13 @@
     }
     $('authGate').hidden = false;
     try {
-      const status = await window.desktopBridge.getAuthStatus();
-      setAuthPanel(status.configured ? 'login' : 'setup');
+      await window.desktopBridge.getAuthStatus();
+      setAuthPanel('login');
     } catch (error) {
       setAuthPanel('login');
       setAuthMessage('login', 'تعذر التحقق من إعداد الحسابات: ' + error.message);
     }
   }
-
-  $('authSetupForm').addEventListener('submit', async event => {
-    event.preventDefault();
-    const user1Password = $('setupUser1Password').value;
-    const user2Password = $('setupUser2Password').value;
-    const supervisorPassword = $('setupSupervisorPassword').value;
-    if (user1Password !== $('setupUser1Confirm').value ||
-        user2Password !== $('setupUser2Confirm').value ||
-        supervisorPassword !== $('setupSupervisorConfirm').value) {
-      setAuthMessage('setup', 'تأكيد كلمة المرور غير مطابق.');
-      return;
-    }
-    const submit = $('authSetupSubmit');
-    submit.disabled = true;
-    setAuthMessage('setup', 'جارٍ حفظ الحسابات...', false);
-    try {
-      await window.desktopBridge.setupAccounts({
-        user1: { displayName: $('setupUser1Name').value.trim(), username: $('setupUser1Username').value.trim(), password: user1Password },
-        user2: { displayName: $('setupUser2Name').value.trim(), username: $('setupUser2Username').value.trim(), password: user2Password },
-        supervisor: { displayName: $('setupSupervisorName').value.trim(), email: $('setupSupervisorEmail').value.trim(), password: supervisorPassword }
-      });
-      $('authIdentifier').value = $('setupUser1Username').value.trim();
-      $('authPassword').value = '';
-      ['setupUser1Password','setupUser1Confirm','setupUser2Password','setupUser2Confirm','setupSupervisorPassword','setupSupervisorConfirm'].forEach(id => { $(id).value = ''; });
-      setAuthPanel('login');
-      setAuthMessage('login', 'تم إنشاء الحسابات الثلاثة. سجّل الدخول بحسابك.', false);
-    } catch (error) {
-      setAuthMessage('setup', error.message || 'تعذر إنشاء الحسابات.');
-    } finally {
-      submit.disabled = false;
-    }
-  });
 
   $('authLoginForm').addEventListener('submit', async event => {
     event.preventDefault();
@@ -1776,6 +1749,32 @@
       await enterAuthenticatedApp(user);
     } catch (error) {
       setAuthMessage('login', error.message || 'تعذر تسجيل الدخول.');
+    } finally {
+      submit.disabled = false;
+    }
+  });
+
+  $('authChangeForm').addEventListener('submit', async event => {
+    event.preventDefault();
+    const password = $('authNewPassword').value;
+    if (password.length < 10) {
+      setAuthMessage('change', 'كلمة المرور الجديدة يجب ألا تقل عن 10 أحرف.');
+      return;
+    }
+    if (password !== $('authNewPasswordConfirm').value) {
+      setAuthMessage('change', 'تأكيد كلمة المرور غير مطابق.');
+      return;
+    }
+    const submit = $('authChangeSubmit');
+    submit.disabled = true;
+    setAuthMessage('change', 'جارٍ تحديث كلمة المرور...', false);
+    try {
+      const user = await window.desktopBridge.changePassword({ password });
+      $('authNewPassword').value = '';
+      $('authNewPasswordConfirm').value = '';
+      await enterAuthenticatedApp(user);
+    } catch (error) {
+      setAuthMessage('change', error.message || 'تعذر تحديث كلمة المرور.');
     } finally {
       submit.disabled = false;
     }
@@ -1798,6 +1797,8 @@
     document.documentElement.classList.add('desktop-auth-required');
     $('authGate').hidden = false;
     $('authPassword').value = '';
+    $('authNewPassword').value = '';
+    $('authNewPasswordConfirm').value = '';
     setAuthPanel('login');
   });
 
