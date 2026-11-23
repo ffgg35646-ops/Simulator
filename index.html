@@ -19,7 +19,7 @@
         <p class="auth-description">اكتب بيانات الحساب للمتابعة إلى البرنامج.</p>
         <form id="authLoginForm" class="auth-form">
           <label>اسم المستخدم أو البريد الإلكتروني
-            <input id="authIdentifier" autocomplete="username" placeholder="اسم المستخدم أو بريد المشرف" required />
+            <input id="authIdentifier" autocomplete="username" placeholder="scale01 أو البريد الإلكتروني للمشرف" required />
           </label>
           <label>كلمة المرور
             <input id="authPassword" type="password" autocomplete="current-password" placeholder="كلمة المرور" required />
@@ -29,34 +29,18 @@
         </form>
       </div>
 
-      <div id="authSetupPanel" hidden>
-        <h1>إعداد الحسابات لأول مرة</h1>
-        <p class="auth-description">أنشئ حسابين لمستخدمي الميزان وحسابًا للمشرف. هذه الخطوة تظهر مرة واحدة، وسيتم إسناد التذاكر القديمة للمستخدم الأول.</p>
-        <form id="authSetupForm" class="auth-form">
-          <div class="auth-account-section">
-            <strong>المستخدم الأول</strong>
-            <label>الاسم الظاهر<input id="setupUser1Name" placeholder="مثال: موظف الميزان الأول" required /></label>
-            <label>اسم المستخدم<input id="setupUser1Username" autocomplete="username" minlength="3" required /></label>
-            <label>كلمة المرور<input id="setupUser1Password" type="password" autocomplete="new-password" minlength="8" required /></label>
-            <label>تأكيد كلمة المرور<input id="setupUser1Confirm" type="password" autocomplete="new-password" minlength="8" required /></label>
-          </div>
-          <div class="auth-account-section">
-            <strong>المستخدم الثاني</strong>
-            <label>الاسم الظاهر<input id="setupUser2Name" placeholder="مثال: موظف الميزان الثاني" required /></label>
-            <label>اسم المستخدم<input id="setupUser2Username" autocomplete="username" minlength="3" required /></label>
-            <label>كلمة المرور<input id="setupUser2Password" type="password" autocomplete="new-password" minlength="8" required /></label>
-            <label>تأكيد كلمة المرور<input id="setupUser2Confirm" type="password" autocomplete="new-password" minlength="8" required /></label>
-          </div>
-          <div class="auth-account-section">
-            <strong>حساب المشرف</strong>
-            <label>اسم المشرف<input id="setupSupervisorName" placeholder="المشرف" required /></label>
-            <label>البريد الإلكتروني<input id="setupSupervisorEmail" type="email" autocomplete="email" required /></label>
-            <label>كلمة المرور<input id="setupSupervisorPassword" type="password" autocomplete="new-password" minlength="8" required /></label>
-            <label>تأكيد كلمة المرور<input id="setupSupervisorConfirm" type="password" autocomplete="new-password" minlength="8" required /></label>
-          </div>
-          <p class="auth-security-note">كلمات المرور لا تُحفظ كنص ظاهر؛ يتم حفظ بصمة مشفّرة لكل كلمة مرور.</p>
-          <button class="btn btn-primary btn-large" type="submit" id="authSetupSubmit">حفظ الحسابات الثلاثة</button>
-          <p class="auth-message" id="authSetupMessage" role="status"></p>
+      <div id="authChangePanel" hidden>
+        <h1>تغيير كلمة المرور المؤقتة</h1>
+        <p class="auth-description">لأمان الحساب، غيّر كلمة المرور المؤقتة قبل الدخول إلى لوحة التشغيل. لا تقل كلمة المرور الجديدة عن 10 أحرف.</p>
+        <form id="authChangeForm" class="auth-form">
+          <label>كلمة المرور الجديدة
+            <input id="authNewPassword" type="password" autocomplete="new-password" minlength="10" required />
+          </label>
+          <label>تأكيد كلمة المرور الجديدة
+            <input id="authNewPasswordConfirm" type="password" autocomplete="new-password" minlength="10" required />
+          </label>
+          <button class="btn btn-primary btn-large" type="submit" id="authChangeSubmit">حفظ كلمة المرور والدخول</button>
+          <p class="auth-message" id="authChangeMessage" role="status"></p>
         </form>
       </div>
     </div>
