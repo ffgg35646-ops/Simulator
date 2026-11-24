@@ -406,3 +406,24 @@ html.operator-dashboard-only .operator-logout-button[hidden]{
     font-size:18px;
   }
 }
+
+
+/* Calm, high-contrast logout buttons for both account types. */
+.logout-button,
+.operator-logout-button{
+  background:#27343d !important;
+  border-color:#465761 !important;
+  color:#f0f4f6 !important;
+  box-shadow:none !important;
+}
+.logout-button:hover,
+.operator-logout-button:hover{
+  background:#33434d !important;
+  border-color:#647781 !important;
+  color:#ffffff !important;
+}
+.logout-button:focus-visible,
+.operator-logout-button:focus-visible{
+  outline:2px solid #91a4ae;
+  outline-offset:2px;
+}
