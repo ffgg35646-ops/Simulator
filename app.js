@@ -638,16 +638,11 @@
     const reportSource = ownerFilter === 'all'
       ? records
       : records.filter(record => record.createdByUserId === ownerFilter);
-    const filtered = searchRecords($('reportSearch')?.value || '', reportSource);
+    const filtered = reportSource.slice();
     const total = filtered.reduce((s,r)=>s+r.netWeight,0);
     $('reportCount').textContent = fmt(filtered.length);
     $('reportNet').textContent = fmt(total)+' كجم';
     $('reportAverage').textContent = fmt(filtered.length ? Math.round(total/filtered.length) : 0)+' كجم';
-    $('reportResultCount').textContent = fmt(filtered.length) + ' نتيجة من أصل ' + fmt(reportSource.length) + ' عملية';
-    const days = Array.from({length:7},(_,i)=>{const d=new Date();d.setDate(d.getDate()-(6-i));return d;});
-    const counts = days.map(d=>filtered.filter(r=>dateKey(new Date(r.createdAt))===dateKey(d)).length);
-    const max = Math.max(1,...counts);
-    $('weeklyChart').innerHTML = filtered.length ? days.map((d,i)=>'<div class="chart-column"><div class="chart-bar" style="height:'+Math.max(4,counts[i]/max*125)+'px"><span>'+counts[i]+'</span></div><small>'+d.toLocaleDateString('ar-EG',{weekday:'short'})+'</small></div>').join('') : '<div class="chart-empty">'+(reportSource.length ? 'لا توجد سجلات مطابقة للبحث.' : 'ستظهر الإحصائيات بعد تسجيل عمليات الوزن.')+'</div>';
     const emptyColumns = activeUser?.role === 'supervisor' ? 14 : 13;
     $('reportRecordsTable').innerHTML = filtered.length ? filtered.map(r=>rowMarkup(r,true)).join('') : '<tr class="empty-row"><td colspan="'+emptyColumns+'">'+(reportSource.length ? 'لا توجد نتائج مطابقة للبحث' : 'لا توجد عمليات مسجلة')+'</td></tr>';
   }
@@ -1367,8 +1362,6 @@
   $('resetTicket').addEventListener('click',resetTicket);
   $('recordSearch').addEventListener('input',renderRecords);
   $('clearRecordSearch').addEventListener('click',()=>{ $('recordSearch').value=''; renderRecords(); });
-  $('reportSearch').addEventListener('input',renderReports);
-  $('clearReportSearch').addEventListener('click',()=>{ $('reportSearch').value=''; renderReports(); });
   $('exportRecords').addEventListener('click',exportCSV);
   $('exportExcel').addEventListener('click',exportExcel);
   function setExcelSyncStatus(status) {
@@ -1682,7 +1675,7 @@
     $('openExcelFile').hidden = !isSupervisor;
     $('chooseExcelFile').hidden = !isSupervisor;
     $('clearData').hidden = isSupervisor;
-    document.querySelectorAll('[data-delete-all-records]').forEach(button => { button.hidden = isSupervisor; });
+    document.querySelectorAll('[data-delete-all-records]').forEach(button => { button.hidden = !isSupervisor; });
     $('sessionUserName').textContent = isSupervisor
       ? 'المشرف: ' + activeUser.displayName
       : 'المستخدم: ' + activeUser.displayName;
