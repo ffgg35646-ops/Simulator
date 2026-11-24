@@ -371,3 +371,38 @@ html.operator-dashboard-only #ticketDetailsFields .trailer-number-field {
   .report-records-heading{align-items:stretch;flex-direction:column}
   .report-records-heading .btn{width:100%}
 }
+
+
+/* Make the existing logout flow visible on the simplified operator header. */
+html.operator-dashboard-only .operator-brand-title{
+  position:relative;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  min-height:50px;
+}
+html.operator-dashboard-only .operator-brand-title>span{
+  display:block;
+  text-align:center;
+}
+html.operator-dashboard-only .operator-logout-button{
+  position:absolute;
+  left:0;
+  top:50%;
+  transform:translateY(-50%);
+  padding:10px 15px;
+  font-size:11px;
+  white-space:nowrap;
+}
+html.operator-dashboard-only .operator-logout-button[hidden]{
+  display:none!important;
+}
+@media(max-width:560px){
+  html.operator-dashboard-only .operator-logout-button{
+    padding:8px 9px;
+    font-size:10px;
+  }
+  html.operator-dashboard-only .operator-brand-title{
+    font-size:18px;
+  }
+}
