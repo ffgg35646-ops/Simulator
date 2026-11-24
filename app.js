@@ -14,9 +14,7 @@
   let rawScaleWeight = null;
   let isStable = true;
   let activeWeightSource = "waiting";
-  let firstCapture = null;
-  let secondCapture = null;
-  let activeTicketDetails = null;
+  let ticketSaved = false;
   let activeRecord = null;
   let toastTimer = null;
   let serialPort = null;
@@ -78,7 +76,6 @@
   function setWeight(value) {
     liveWeight = Math.max(0, Math.min(CAPACITY, Math.round(Number(value) * 100) / 100));
     $('liveWeight').innerHTML = fmt(liveWeight) + '<span>كجم</span>';
-    if (document.activeElement !== $('manualWeight')) $('manualWeight').value = liveWeight;
     $('weightSourceLabel').textContent = activeWeightSource === 'serial' ? 'قراءة من الميزان' : activeWeightSource === 'manual' ? 'إدخال يدوي' : 'بانتظار القراءة';
     const percent = liveWeight / CAPACITY * 100;
     $('capacityFill').style.width = percent + '%';
@@ -94,22 +91,41 @@
 
   }
   function capture() {
-    if (activeWeightSource === 'waiting') { $('formMessage').textContent = 'اختر الإدخال اليدوي أو وصّل الميزان وانتظر أول قراءة.'; return; }
-    if (!isStable) { $('formMessage').textContent = 'لا يمكن تسجيل الوزن قبل استقرار القراءة.'; return; }
-    if (liveWeight > CAPACITY) { $('formMessage').textContent = 'الوزن يتجاوز السعة القصوى.'; return; }
-    if (activeWeightSource === 'manual' && !$('manualWeight').value.trim()) {
-      $('formMessage').textContent = '';
-      $('manualWeight').focus();
+    if (ticketSaved) {
+      $('formMessage').textContent = 'تم حفظ العملية بالفعل. اضغط «عملية جديدة» لبدء تذكرة أخرى.';
       return;
     }
-    if (activeWeightSource !== 'manual' && rawScaleWeight == null) {
-      $('formMessage').textContent = 'بانتظار قراءة جديدة من الميزان قبل تسجيل الوزن.';
+    const firstRaw = $('firstWeightInput').value.trim();
+    const secondRaw = $('secondWeightInput').value.trim();
+    if (!firstRaw) {
+      $('formMessage').textContent = 'أدخل الوزن الأول.';
+      $('firstWeightInput').focus();
       return;
+    }
+    if (!secondRaw) {
+      $('formMessage').textContent = 'أدخل الوزن الثاني.';
+      $('secondWeightInput').focus();
+      return;
+    }
+    const firstWeight = Number(firstRaw);
+    const secondWeight = Number(secondRaw);
+    for (const [label, value, inputId] of [
+      ['الأول', firstWeight, 'firstWeightInput'],
+      ['الثاني', secondWeight, 'secondWeightInput']
+    ]) {
+      if (!Number.isFinite(value) || value < 0 || value > CAPACITY) {
+        $('formMessage').textContent = 'أدخل الوزن ' + label + ' بقيمة صحيحة من 0 إلى 500,000 كجم.';
+        $(inputId).focus();
+        return;
+      }
     }
     const plate = $('plateInput').value.trim();
-    if (!plate) { $('formMessage').textContent = 'اكتب رقم السيارة أولًا.'; $('plateInput').focus(); return; }
-    const originalWeight = rawScaleWeight == null ? null : Math.round(Number(rawScaleWeight) * 100) / 100;
-    const captureData = { weight: liveWeight, originalWeight, adjusted: originalWeight != null && Math.abs(originalWeight - liveWeight) > 0.005, time: now().toISOString(), source: activeWeightSource };
+    if (!plate) {
+      $('formMessage').textContent = 'اكتب رقم السيارة أولًا.';
+      $('plateInput').focus();
+      return;
+    }
+    const timestamp = now().toISOString();
     const ticketDetails = {
       plate,
       trailer: $('trailerInput').value.trim() || '—',
@@ -119,78 +135,59 @@
       governorate: $('governorateInput').value || '—',
       movementType: $('movementTypeInput').value || 'وارد'
     };
-    rawScaleWeight = null;
-    if (!firstCapture) {
-      firstCapture = captureData;
-      activeTicketDetails = ticketDetails;
-      if (activeWeightSource !== 'manual') activeWeightSource = 'waiting';
-      setWeight(0);
-      $('manualWeight').value = '';
-      setStability(false);
-      $('formMessage').textContent = 'تم حفظ الوزنة الأولى وبيانات العملية. أدخل الوزن الجديد لتسجيل الوزنة الثانية.';
-      updateCaptureUI();
-      showToast('تم تسجيل الوزنة الأولى');
-      return;
-    }
-    if (!secondCapture) {
-      secondCapture = captureData;
-      const net = Math.abs(firstCapture.weight - secondCapture.weight);
-      const record = {
-        id: ticketNo(), ...(activeTicketDetails || ticketDetails),
-        firstWeight: firstCapture.weight, secondWeight: secondCapture.weight,
-        firstOriginalWeight: firstCapture.originalWeight, secondOriginalWeight: secondCapture.originalWeight,
-        firstAdjusted: firstCapture.adjusted, secondAdjusted: secondCapture.adjusted,
-        firstSource: firstCapture.source, secondSource: secondCapture.source,
-        netWeight: net, firstTime: firstCapture.time, secondTime: secondCapture.time,
-        createdAt: now().toISOString(),
-        createdByUserId: activeUser?.id || null,
-        createdByUserName: activeUser?.displayName || '',
-        createdByUsername: activeUser?.username || '',
-        source: [firstCapture.source, secondCapture.source].every(s => s === 'serial') ? 'RS232 / USB Serial' : [firstCapture.source, secondCapture.source].every(s => s === 'manual') ? 'إدخال يدوي' : 'مختلط: قراءة ميزان / إدخال يدوي'
-      };
-      records.unshift(record); activeRecord = record; saveRecords();
-      $('formMessage').textContent = 'اكتملت عملية الوزن وحُفظت التذكرة بنجاح.';
-      updateCaptureUI(); showToast('تم حفظ التذكرة ' + record.id); openTicket(record);
-      return;
-    }
-    $('formMessage').textContent = 'اكتملت العملية الحالية. اضغط «عملية جديدة» لبدء تذكرة أخرى.';
+    const acceptedFirstWeight = Math.round(firstWeight * 100) / 100;
+    const acceptedSecondWeight = Math.round(secondWeight * 100) / 100;
+    const record = {
+      id: ticketNo(),
+      ...ticketDetails,
+      firstWeight: acceptedFirstWeight,
+      secondWeight: acceptedSecondWeight,
+      firstOriginalWeight: null,
+      secondOriginalWeight: null,
+      firstAdjusted: false,
+      secondAdjusted: false,
+      firstSource: 'manual',
+      secondSource: 'manual',
+      netWeight: Math.round(Math.abs(acceptedFirstWeight - acceptedSecondWeight) * 100) / 100,
+      firstTime: timestamp,
+      secondTime: timestamp,
+      createdAt: timestamp,
+      createdByUserId: activeUser?.id || null,
+      createdByUserName: activeUser?.displayName || '',
+      createdByUsername: activeUser?.username || '',
+      source: 'إدخال يدوي'
+    };
+    records.unshift(record);
+    activeRecord = record;
+    ticketSaved = true;
+    saveRecords();
+    $('formMessage').textContent = 'تم حفظ العملية وإصدار البون بنجاح.';
+    $('captureWeight').textContent = 'تم الحفظ';
+    $('captureWeight').disabled = true;
+    showToast('تم حفظ التذكرة');
+    openTicket(record);
   }
   function updateCaptureUI() {
-    const hasFirst = Boolean(firstCapture);
-    const hasSecond = Boolean(secondCapture);
-    $('firstWeight').textContent = hasFirst ? fmt(firstCapture.weight) + ' كجم' : '—';
-    $('firstTime').textContent = hasFirst ? stamp(new Date(firstCapture.time)) : 'لم تسجل بعد';
-    $('secondWeight').textContent = hasSecond ? fmt(secondCapture.weight) + ' كجم' : '—';
-    $('secondTime').textContent = hasSecond ? stamp(new Date(secondCapture.time)) : 'لم تسجل بعد';
-    $('netWeight').textContent = hasFirst && hasSecond ? fmt(Math.abs(firstCapture.weight - secondCapture.weight)) + ' كجم' : '—';
-    $('ticketDetailsFields').hidden = hasFirst;
-    $('ticketDetailsSummary').hidden = !hasFirst;
-    $('secondCaptureBox').hidden = !hasFirst;
-    $('captureArrow').hidden = !hasFirst;
-    $('netCaptureBox').hidden = !hasSecond;
-    if (hasFirst && activeTicketDetails) {
-      const details = [
-        ['العميل', activeTicketDetails.customer], ['السائق', activeTicketDetails.driver],
-        ['الشحنة', activeTicketDetails.shipment], ['المحافظة', activeTicketDetails.governorate],
-        ['الحركة', activeTicketDetails.movementType], ['السيارة', activeTicketDetails.plate],
-        ['المقطورة', activeTicketDetails.trailer]
-      ];
-      $('ticketDetailsSummary').innerHTML = details.map(([label,value]) =>
-        '<div class="ticket-summary-item"><small>'+esc(label)+'</small><strong>'+esc(value || '—')+'</strong></div>'
-      ).join('');
+    const firstRaw = $('firstWeightInput').value.trim();
+    const secondRaw = $('secondWeightInput').value.trim();
+    const first = Number(firstRaw);
+    const second = Number(secondRaw);
+    const valid = Boolean(firstRaw && secondRaw) &&
+      Number.isFinite(first) && Number.isFinite(second) &&
+      first >= 0 && second >= 0 && first <= CAPACITY && second <= CAPACITY;
+    $('netCaptureBox').hidden = !valid;
+    $('netWeight').textContent = valid
+      ? fmt(Math.round(Math.abs(first - second) * 100) / 100) + ' كجم'
+      : '—';
+    if (!ticketSaved) {
+      $('captureWeight').disabled = false;
+      $('captureWeight').textContent = 'حفظ';
     }
-    $('captureHelp').textContent = hasSecond
-      ? ''
-      : hasFirst
-        ? 'تم تثبيت بيانات الشحنة والوزنة الأولى؛ سجّل الوزنة الثانية فقط.'
-        : 'أدخل بيانات العملية ثم سجّل الوزنة الأولى';
-    $('weighStep').textContent = hasSecond ? 'اكتملت الوزنتان' : hasFirst ? 'الوزنة الثانية' : 'الوزنة الأولى';
-    $('captureWeight').textContent = hasSecond ? 'اكتملت العملية' : hasFirst ? 'تسجيل الوزنة الثانية' : 'تسجيل الوزنة الأولى';
-    $('captureWeight').disabled = hasSecond;
   }
   function resetTicket() {
-    firstCapture = null; secondCapture = null; activeTicketDetails = null;
-    $('manualWeight').value = '';
+    ticketSaved = false;
+    $('firstWeightInput').value = '';
+    $('secondWeightInput').value = '';
     $('formMessage').textContent = '';
     $('plateInput').value = '';
     $('trailerInput').value = '';
@@ -199,7 +196,8 @@
     $('shipmentInput').value = '';
     $('governorateInput').value = '';
     $('movementTypeInput').value = 'وارد';
-    updateCaptureUI(); $('plateInput').focus();
+    updateCaptureUI();
+    $('plateInput').focus();
   }
   function openTicket(record) {
     activeRecord = record;
@@ -207,7 +205,7 @@
     $('ticketModal').classList.add('open');
   }
   function ticketMarkup(r) {
-    return '<div class="ticket-paper"><div class="ticket-location">مدينة السادات<br>المدفن الصحي</div><div class="ticket-number">رقم التذكرة: ' + esc(r.id) + '</div>' +
+    return '<div class="ticket-paper"><div class="ticket-location">مدينة السادات<br>المدفن الصحي</div>' +
       '<div class="ticket-top-grid">' +
       ticketField('اسم العميل',r.customer) + ticketField('اسم السائق',r.driver) + ticketField('نوع الحركة',r.movementType || '—') +
       ticketField('رقم السيارة',r.plate) + ticketField('رقم المقطورة',r.trailer || '—') + ticketField('المحافظة',r.governorate || '—') +
@@ -1342,41 +1340,28 @@
   document.querySelectorAll('[data-view]').forEach(b=>b.addEventListener('click',()=>switchView(b.dataset.view)));
   document.querySelectorAll('[data-go]').forEach(b=>b.addEventListener('click',()=>switchView(b.dataset.go)));
   $('mobileMenu').addEventListener('click',()=>$('sidebar').classList.toggle('open'));
-  $('manualWeight').addEventListener('input',()=>{
-    $('weightMode').value = 'manual';
-    activeWeightSource = 'manual';
-    rawScaleWeight = null;
-    const raw = $('manualWeight').value;
-    if (raw === '') {
-      setWeight(0);
-      setStability(false);
+  ['firstWeightInput','secondWeightInput'].forEach(id => {
+    $(id).addEventListener('input', () => {
+      if (ticketSaved) return;
       $('formMessage').textContent = '';
-      return;
-    }
-    const value = Number(raw);
-    if (!Number.isFinite(value) || value < 0 || value > CAPACITY) {
-      setStability(false);
-      $('formMessage').textContent = 'أدخل وزنًا صحيحًا من 0 إلى 500,000 كجم.';
-      return;
-    }
-    setWeight(value);
-    setStability(true);
-    $('formMessage').textContent = firstCapture
-      ? 'قراءة الوزنة الثانية تتحدث تلقائيًا. اضغط تسجيل الوزنة الثانية عند استقرار الوزن.'
-      : 'قراءة الوزن تتحدث تلقائيًا. اضغط تسجيل الوزنة الأولى عند استقرار الوزن.';
+      updateCaptureUI();
+    });
   });
   $('weightMode').addEventListener('change',()=>{
     if ($('weightMode').value === 'manual') {
       activeWeightSource = 'manual';
       rawScaleWeight = null;
-      $('formMessage').textContent = 'وضع الإدخال اليدوي مفعل. اكتب الوزن وسيتم تحديث القراءة تلقائيًا.';
-      $('manualWeight').value = firstCapture && !secondCapture ? '' : liveWeight > 0 ? liveWeight : '';
+      $('formMessage').textContent = 'وضع الإدخال اليدوي مفعل. أدخل الوزنتين في الخانتين ثم اضغط حفظ.';
     } else {
-      activeWeightSource = 'waiting';
+      activeWeightSource = serialPort ? 'serial' : 'waiting';
       rawScaleWeight = null;
-      $('formMessage').textContent = serialPort ? 'تم تفعيل القراءة التلقائية؛ انتظر القراءة التالية من الميزان.' : 'وضع التلقائي مفعل؛ وصّل الميزان لقراءة الوزن.';
+      $('formMessage').textContent = serialPort
+        ? 'تم تفعيل القراءة التلقائية للميزان. أدخل الوزنتين ثم اضغط حفظ.'
+        : 'وضع التلقائي مفعل؛ وصّل الميزان لعرض القراءة المباشرة. أدخل الوزنتين ثم اضغط حفظ.';
     }
-    $('weightSourceLabel').textContent = activeWeightSource === 'serial' ? 'قراءة من الميزان' : activeWeightSource === 'manual' ? 'إدخال يدوي' : 'بانتظار القراءة';
+    $('weightSourceLabel').textContent = activeWeightSource === 'serial'
+      ? 'قراءة من الميزان'
+      : activeWeightSource === 'manual' ? 'إدخال يدوي' : 'بانتظار القراءة';
   });
   $('captureWeight').addEventListener('click',capture);
   $('resetTicket').addEventListener('click',resetTicket);
@@ -1790,9 +1775,11 @@
     activeUser = null;
     records = [];
     activeRecord = null;
-    firstCapture = null;
-    secondCapture = null;
-    activeTicketDetails = null;
+    ticketSaved = false;
+    $('firstWeightInput').value = '';
+    $('secondWeightInput').value = '';
+    $('captureWeight').disabled = false;
+    $('captureWeight').textContent = 'حفظ';
     rawScaleWeight = null;
     activeWeightSource = 'waiting';
     $('ticketModal').classList.remove('open');
