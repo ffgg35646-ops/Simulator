@@ -427,3 +427,11 @@ html.operator-dashboard-only .operator-logout-button[hidden]{
   outline:2px solid #91a4ae;
   outline-offset:2px;
 }
+
+
+/* White text for dark-theme interface elements that previously used near-black text. */
+.brand-mark,
+.brand-mark span,
+.btn-primary{
+  color:#ffffff !important;
+}
