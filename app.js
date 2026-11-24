@@ -654,6 +654,8 @@
     $('reportRecordsTable').innerHTML = filtered.length ? filtered.map(r=>rowMarkup(r,true)).join('') : '<tr class="empty-row"><td colspan="'+emptyColumns+'">'+(reportSource.length ? 'لا توجد نتائج مطابقة للبحث' : 'لا توجد عمليات مسجلة')+'</td></tr>';
   }
   function switchView(name) {
+    // Operator accounts are intentionally limited to the single operating screen.
+    if (activeUser?.role === 'operator' && name !== 'dashboard') name = 'dashboard';
     document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active',v.id==='view-'+name));
     document.querySelectorAll('.nav-link').forEach(v=>v.classList.toggle('active',v.dataset.view===name));
     const titles={dashboard:'لوحة التشغيل',weighings:'سجل عمليات الوزن',vehicles:'السيارات والعملاء',reports:'التقارير والإحصائيات',devices:'الأجهزة والاتصال'};
@@ -1682,6 +1684,8 @@
 
   function configureRoleUI() {
     const isSupervisor = activeUser?.role === 'supervisor';
+    const isOperator = activeUser?.role === 'operator';
+    document.documentElement.classList.toggle('operator-dashboard-only', isOperator);
     document.querySelectorAll('.nav-link').forEach(button => {
       button.hidden = isSupervisor && button.dataset.view !== 'reports';
     });
@@ -1794,6 +1798,7 @@
     $('ticketModal').classList.remove('open');
     $('sessionUserName').hidden = true;
     $('logoutButton').hidden = true;
+    document.documentElement.classList.remove('operator-dashboard-only');
     document.documentElement.classList.add('desktop-auth-required');
     $('authGate').hidden = false;
     $('authPassword').value = '';
