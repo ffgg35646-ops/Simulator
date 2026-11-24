@@ -226,3 +226,47 @@ html.operator-dashboard-only .mobile-menu{display:none!important}
 @media(max-width:850px){
   html.operator-dashboard-only .main-area{padding:0 16px 20px}
 }
+
+
+/* Simplified operator screen: brand title, live scale card, then weighing form card. */
+.operator-brand-title{display:none}
+html.operator-dashboard-only .topbar{
+  height:64px;
+  min-height:64px;
+  margin-bottom:16px;
+  justify-content:center;
+}
+html.operator-dashboard-only .topbar-title,
+html.operator-dashboard-only .topbar-actions{
+  display:none!important;
+}
+html.operator-dashboard-only .operator-brand-title{
+  display:block;
+  width:100%;
+  text-align:center;
+  color:var(--text);
+  font-size:21px;
+  line-height:1.4;
+  font-weight:900;
+}
+html.operator-dashboard-only .welcome-row,
+html.operator-dashboard-only #dashboardStatsGrid,
+html.operator-dashboard-only .recent-panel,
+html.operator-dashboard-only .app-footer{
+  display:none!important;
+}
+html.operator-dashboard-only .work-grid{
+  grid-template-columns:minmax(0,1fr);
+  gap:14px;
+}
+html.operator-dashboard-only .work-grid>.panel{
+  margin-bottom:0;
+}
+@media(max-width:850px){
+  html.operator-dashboard-only .topbar{
+    height:60px;
+    min-height:60px;
+    margin-bottom:13px;
+  }
+  html.operator-dashboard-only .operator-brand-title{font-size:19px}
+}
