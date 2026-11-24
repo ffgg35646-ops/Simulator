@@ -218,3 +218,11 @@ html.desktop-auth-required .app-shell{display:none!important}
   #ticketDetailsFields .vehicle-number-field,
   #ticketDetailsFields .trailer-number-field{grid-row:auto}
 }
+
+/* Operator Windows accounts use one full-width operating screen. Supervisor UI is unchanged. */
+html.operator-dashboard-only .sidebar{display:none!important}
+html.operator-dashboard-only .main-area{margin-right:0!important;width:100%;max-width:none;padding:0 30px 22px}
+html.operator-dashboard-only .mobile-menu{display:none!important}
+@media(max-width:850px){
+  html.operator-dashboard-only .main-area{padding:0 16px 20px}
+}
