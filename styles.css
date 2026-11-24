@@ -203,20 +203,35 @@ html.desktop-auth-required .app-shell{display:none!important}
   .session-user-name{display:none}
 }
 
-//* Ticket details: three columns on desktop; weight entry remains full width */
-#ticketDetailsFields.form-grid{grid-template-columns:repeat(3,minmax(0,1fr))}
-#ticketDetailsFields.form-grid>label{grid-column:auto}
-@media(max-width:560px){
-  #ticketDetailsFields.form-grid{grid-template-columns:minmax(0,1fr)}
-  #ticketDetailsFields.form-grid>label{grid-column:auto}
+/* Operation details: two equal fields per row, matching the weighing inputs. */
+#ticketDetailsFields.form-grid{
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  column-gap:12px;
+  row-gap:12px;
 }
-
-/* Keep vehicle and trailer numbers side by side on the same row */
+#ticketDetailsFields.form-grid>label{
+  grid-column:auto;
+  display:grid;
+  align-content:start;
+  gap:6px;
+  min-width:0;
+}
+#ticketDetailsFields.form-grid input,
+#ticketDetailsFields.form-grid select{
+  width:100%;
+  min-width:0;
+  min-height:54px;
+  height:54px;
+  box-sizing:border-box;
+  padding:10px 11px;
+  font-size:13px;
+}
 #ticketDetailsFields .vehicle-number-field,
-#ticketDetailsFields .trailer-number-field{grid-row:3}
+#ticketDetailsFields .trailer-number-field{grid-row:auto}
 @media(max-width:560px){
-  #ticketDetailsFields .vehicle-number-field,
-  #ticketDetailsFields .trailer-number-field{grid-row:auto}
+  #ticketDetailsFields.form-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+  #ticketDetailsFields.form-grid input,
+  #ticketDetailsFields.form-grid select{min-height:54px;height:54px;font-size:12px;padding:9px 7px}
 }
 
 /* Operator Windows accounts use one full-width operating screen. Supervisor UI is unchanged. */
