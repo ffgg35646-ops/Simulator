@@ -270,3 +270,42 @@ html.operator-dashboard-only .work-grid>.panel{
   }
   html.operator-dashboard-only .operator-brand-title{font-size:19px}
 }
+
+
+/* Paired first/second weighing inputs for one-step ticket saving. */
+.manual-weight-row.weight-input-pair{
+  display:grid;
+  grid-template-columns:repeat(2,minmax(0,1fr));
+  gap:12px;
+}
+.manual-weight-row.weight-input-pair label{
+  display:grid;
+  gap:6px;
+  min-width:0;
+  color:#91a4ae;
+  font-size:10px;
+}
+.manual-weight-row.weight-input-pair input{
+  width:100%;
+  min-width:0;
+  min-height:54px;
+  height:54px;
+  background:#0d1820;
+  border:1px solid #2a3b46;
+  border-radius:8px;
+  padding:10px 11px;
+  color:#edf4f7;
+  outline:none;
+  font-size:13px;
+  text-align:center;
+}
+.manual-weight-row.weight-input-pair input:focus{
+  border-color:#29b9ae;
+  box-shadow:0 0 0 3px #20c6b715;
+}
+.weigh-captures{grid-template-columns:minmax(0,1fr)}
+.weigh-captures .net-box{grid-column:1/-1}
+@media(max-width:560px){
+  .manual-weight-row.weight-input-pair{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .manual-weight-row.weight-input-pair input{font-size:12px;padding:9px 7px}
+}
