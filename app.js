@@ -1681,6 +1681,7 @@
       : 'المستخدم: ' + activeUser.displayName;
     $('sessionUserName').hidden = false;
     $('logoutButton').hidden = false;
+    $('operatorLogoutButton').hidden = !isOperator;
     switchView(isSupervisor ? 'reports' : 'dashboard');
     if (isSupervisor) populateSupervisorUsers();
   }
@@ -1778,6 +1779,7 @@
     $('ticketModal').classList.remove('open');
     $('sessionUserName').hidden = true;
     $('logoutButton').hidden = true;
+    $('operatorLogoutButton').hidden = true;
     document.documentElement.classList.remove('operator-dashboard-only');
     document.documentElement.classList.add('desktop-auth-required');
     $('authGate').hidden = false;
@@ -1786,6 +1788,8 @@
     $('authNewPasswordConfirm').value = '';
     setAuthPanel('login');
   });
+
+  $('operatorLogoutButton').addEventListener('click', () => $('logoutButton').click());
 
   $('supervisorReportFilter').addEventListener('change', renderReports);
   initializeAuthentication();
