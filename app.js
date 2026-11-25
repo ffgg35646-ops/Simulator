@@ -167,6 +167,129 @@
     showToast('تم حفظ التذكرة');
     openTicket(record);
   }
+
+  function openSupervisorAddModal() {
+    if (activeUser?.role !== 'supervisor') return;
+    const current = now();
+    $('supervisorAddForm').reset();
+    $('supervisorRecordDate').value = [
+      current.getFullYear(),
+      String(current.getMonth() + 1).padStart(2, '0'),
+      String(current.getDate()).padStart(2, '0')
+    ].join('-');
+    $('supervisorRecordTime').value = [
+      String(current.getHours()).padStart(2, '0'),
+      String(current.getMinutes()).padStart(2, '0')
+    ].join(':');
+    updateSupervisorNetPreview();
+    $('supervisorFormMessage').textContent = '';
+    $('supervisorAddModal').classList.add('open');
+    $('supervisorFirstWeight').focus();
+  }
+
+  function closeSupervisorAddModal() {
+    $('supervisorAddModal').classList.remove('open');
+  }
+
+  function updateSupervisorNetPreview() {
+    const firstRaw = $('supervisorFirstWeight').value.trim();
+    const secondRaw = $('supervisorSecondWeight').value.trim();
+    const first = Number(firstRaw);
+    const second = Number(secondRaw);
+    const valid = Boolean(firstRaw && secondRaw) &&
+      Number.isFinite(first) && Number.isFinite(second) &&
+      first >= 0 && second >= 0 && first <= CAPACITY && second <= CAPACITY;
+    $('supervisorNetCaptureBox').hidden = !valid;
+    $('supervisorNetWeight').textContent = valid
+      ? fmt(Math.round(Math.abs(first - second) * 100) / 100) + ' كجم'
+      : '—';
+  }
+
+  async function captureSupervisorRecord() {
+    const message = $('supervisorFormMessage');
+    const firstRaw = $('supervisorFirstWeight').value.trim();
+    const secondRaw = $('supervisorSecondWeight').value.trim();
+    if (!firstRaw || !secondRaw) {
+      message.textContent = 'أدخل الوزنة الأولى والثانية.';
+      return;
+    }
+    const firstWeight = Number(firstRaw);
+    const secondWeight = Number(secondRaw);
+    for (const [label, value, inputId] of [
+      ['الأولى', firstWeight, 'supervisorFirstWeight'],
+      ['الثانية', secondWeight, 'supervisorSecondWeight']
+    ]) {
+      if (!Number.isFinite(value) || value < 0 || value > CAPACITY) {
+        message.textContent = 'أدخل الوزنة ' + label + ' بقيمة صحيحة من 0 إلى 500,000 كجم.';
+        $(inputId).focus();
+        return;
+      }
+    }
+    const plate = $('supervisorPlate').value.trim();
+    if (!plate) {
+      message.textContent = 'اكتب رقم السيارة أولًا.';
+      $('supervisorPlate').focus();
+      return;
+    }
+    const dateValue = $('supervisorRecordDate').value;
+    const timeValue = $('supervisorRecordTime').value;
+    if (!dateValue || !timeValue) {
+      message.textContent = 'حدد تاريخ ووقت العملية.';
+      return;
+    }
+    const operationDate = new Date(dateValue + 'T' + timeValue + ':00');
+    if (!Number.isFinite(operationDate.getTime())) {
+      message.textContent = 'تاريخ أو وقت العملية غير صحيح.';
+      return;
+    }
+    const timestamp = operationDate.toISOString();
+    const acceptedFirstWeight = Math.round(firstWeight * 100) / 100;
+    const acceptedSecondWeight = Math.round(secondWeight * 100) / 100;
+    const record = {
+      id: ticketNo(),
+      plate,
+      trailer: $('supervisorTrailer').value.trim() || '—',
+      driver: $('supervisorDriver').value.trim() || '—',
+      customer: $('supervisorCustomer').value.trim() || '—',
+      shipment: $('supervisorShipment').value.trim() || '—',
+      governorate: $('supervisorGovernorate').value || '—',
+      movementType: $('supervisorMovementType').value || 'وارد',
+      firstWeight: acceptedFirstWeight,
+      secondWeight: acceptedSecondWeight,
+      firstOriginalWeight: null,
+      secondOriginalWeight: null,
+      firstAdjusted: false,
+      secondAdjusted: false,
+      firstSource: 'manual',
+      secondSource: 'manual',
+      netWeight: Math.round(Math.abs(acceptedFirstWeight - acceptedSecondWeight) * 100) / 100,
+      firstTime: timestamp,
+      secondTime: timestamp,
+      createdAt: timestamp,
+      createdByUserId: activeUser?.id || null,
+      createdByUserName: activeUser?.displayName || '',
+      createdByUsername: activeUser?.username || activeUser?.email || '',
+      source: 'إضافة المشرف'
+    };
+    const submit = $('supervisorSaveRecord');
+    submit.disabled = true;
+    message.textContent = 'جارٍ حفظ العملية...';
+    try {
+      const savedRecord = await window.desktopBridge.addSupervisorRecord(record);
+      records = readJSON(STORAGE_KEY, []);
+      activeRecord = savedRecord;
+      renderAll();
+      closeSupervisorAddModal();
+      $('supervisorAddForm').reset();
+      showToast('تم حفظ العملية وإصدار البون');
+      openTicket(savedRecord);
+    } catch (error) {
+      message.textContent = error.message || 'تعذر حفظ العملية.';
+    } finally {
+      submit.disabled = false;
+    }
+  }
+
   function updateCaptureUI() {
     const firstRaw = $('firstWeightInput').value.trim();
     const secondRaw = $('secondWeightInput').value.trim();
@@ -1360,6 +1483,18 @@
   });
   $('captureWeight').addEventListener('click',capture);
   $('resetTicket').addEventListener('click',resetTicket);
+  $('supervisorAddRecord').addEventListener('click', openSupervisorAddModal);
+  $('supervisorFirstWeight').addEventListener('input', updateSupervisorNetPreview);
+  $('supervisorSecondWeight').addEventListener('input', updateSupervisorNetPreview);
+  $('supervisorAddForm').addEventListener('submit', event => {
+    event.preventDefault();
+    captureSupervisorRecord();
+  });
+  $('closeSupervisorAdd').addEventListener('click', closeSupervisorAddModal);
+  $('cancelSupervisorAdd').addEventListener('click', closeSupervisorAddModal);
+  $('supervisorAddModal').addEventListener('click', event => {
+    if (event.target === $('supervisorAddModal')) closeSupervisorAddModal();
+  });
   $('recordSearch').addEventListener('input',renderRecords);
   $('clearRecordSearch').addEventListener('click',()=>{ $('recordSearch').value=''; renderRecords(); });
   $('exportRecords').addEventListener('click',exportCSV);
@@ -1636,6 +1771,71 @@
     if (name === 'change') setTimeout(() => $('authNewPassword').focus(), 0);
   }
 
+
+  function openAccountSettings() {
+    if (!activeUser) return;
+    $('accountDisplayName').value = activeUser.displayName || '';
+    $('accountNewPassword').value = '';
+    $('accountNewPasswordConfirm').value = '';
+    $('accountSettingsMessage').textContent = '';
+    $('accountSettingsMessage').classList.remove('is-error');
+    $('accountSettingsModal').classList.add('open');
+    $('accountDisplayName').focus();
+  }
+
+  function closeAccountSettings() {
+    $('accountSettingsModal').classList.remove('open');
+  }
+
+  $('accountSettingsButton').addEventListener('click', openAccountSettings);
+  $('operatorAccountSettingsButton').addEventListener('click', openAccountSettings);
+  $('closeAccountSettings').addEventListener('click', closeAccountSettings);
+  $('cancelAccountSettings').addEventListener('click', closeAccountSettings);
+  $('accountSettingsModal').addEventListener('click', event => {
+    if (event.target === $('accountSettingsModal')) closeAccountSettings();
+  });
+  $('accountSettingsForm').addEventListener('submit', async event => {
+    event.preventDefault();
+    const displayName = $('accountDisplayName').value.trim();
+    const password = $('accountNewPassword').value;
+    const confirmation = $('accountNewPasswordConfirm').value;
+    const message = $('accountSettingsMessage');
+    message.classList.remove('is-error');
+    if (displayName.length < 2) {
+      message.textContent = 'اكتب اسمًا صحيحًا من حرفين على الأقل.';
+      message.classList.add('is-error');
+      $('accountDisplayName').focus();
+      return;
+    }
+    if (password && password.length < 10) {
+      message.textContent = 'كلمة المرور الجديدة يجب ألا تقل عن 10 أحرف.';
+      message.classList.add('is-error');
+      $('accountNewPassword').focus();
+      return;
+    }
+    if (password !== confirmation) {
+      message.textContent = 'تأكيد كلمة المرور غير مطابق.';
+      message.classList.add('is-error');
+      $('accountNewPasswordConfirm').focus();
+      return;
+    }
+    const submit = $('saveAccountSettings');
+    submit.disabled = true;
+    message.textContent = 'جارٍ حفظ التغييرات...';
+    try {
+      const updatedUser = await window.desktopBridge.updateAccount({ displayName, password });
+      activeUser = updatedUser;
+      $('sessionUserName').textContent = (activeUser.role === 'supervisor' ? 'المشرف: ' : 'المستخدم: ') + activeUser.displayName;
+      closeAccountSettings();
+      showToast('تم تحديث بيانات الحساب فورًا');
+    } catch (error) {
+      message.textContent = error.message || 'تعذر تحديث بيانات الحساب.';
+      message.classList.add('is-error');
+    } finally {
+      submit.disabled = false;
+    }
+  });
+
   function setAuthMessage(panel, message, isError = true) {
     const target = panel === 'change' ? $('authChangeMessage') : $('authLoginMessage');
     target.textContent = message;
@@ -1671,6 +1871,9 @@
       view.hidden = isSupervisor && view.id !== 'view-reports';
     });
     $('supervisorReportControls').hidden = !isSupervisor;
+    $('supervisorAddRecord').hidden = !isSupervisor;
+    $('accountSettingsButton').hidden = !isSupervisor;
+    $('operatorAccountSettingsButton').hidden = !isOperator;
     $('reportUserHeader').hidden = !isSupervisor;
     $('openExcelFile').hidden = !isSupervisor;
     $('chooseExcelFile').hidden = !isSupervisor;
@@ -1780,6 +1983,11 @@
     $('sessionUserName').hidden = true;
     $('logoutButton').hidden = true;
     $('operatorLogoutButton').hidden = true;
+    $('accountSettingsButton').hidden = true;
+    $('operatorAccountSettingsButton').hidden = true;
+    $('supervisorAddRecord').hidden = true;
+    closeAccountSettings();
+    closeSupervisorAddModal();
     document.documentElement.classList.remove('operator-dashboard-only');
     document.documentElement.classList.add('desktop-auth-required');
     $('authGate').hidden = false;
