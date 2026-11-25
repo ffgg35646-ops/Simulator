@@ -16,6 +16,7 @@
   let activeWeightSource = "waiting";
   let ticketSaved = false;
   let activeRecord = null;
+  let editingSupervisorRecordId = null;
   let toastTimer = null;
   let serialPort = null;
   let serialReader = null;
@@ -168,10 +169,8 @@
     openTicket(record);
   }
 
-  function openSupervisorAddModal() {
-    if (activeUser?.role !== 'supervisor') return;
-    const current = now();
-    $('supervisorAddForm').reset();
+  function setSupervisorModalDateTime(value = now()) {
+    const current = value instanceof Date ? value : new Date(value);
     $('supervisorRecordDate').value = [
       current.getFullYear(),
       String(current.getMonth() + 1).padStart(2, '0'),
@@ -181,14 +180,53 @@
       String(current.getHours()).padStart(2, '0'),
       String(current.getMinutes()).padStart(2, '0')
     ].join(':');
+  }
+
+  function openSupervisorAddModal() {
+    if (activeUser?.role !== 'supervisor') return;
+    editingSupervisorRecordId = null;
+    $('supervisorAddForm').reset();
+    $('supervisorAddTitle').textContent = 'إضافة عملية وزن';
+    $('supervisorSaveRecord').textContent = 'حفظ وإصدار البون';
+    setSupervisorModalDateTime(now());
     updateSupervisorNetPreview();
     $('supervisorFormMessage').textContent = '';
     $('supervisorAddModal').classList.add('open');
     $('supervisorFirstWeight').focus();
   }
 
+  function openSupervisorEditModal(recordId) {
+    if (activeUser?.role !== 'supervisor') return;
+    const record = records.find(item => String(item.id) === String(recordId));
+    if (!record) {
+      showToast('السجل المطلوب غير موجود.');
+      return;
+    }
+    editingSupervisorRecordId = String(record.id);
+    $('supervisorAddForm').reset();
+    $('supervisorAddTitle').textContent = 'تعديل سجل الوزن رقم ' + record.id;
+    $('supervisorSaveRecord').textContent = 'حفظ التعديلات وإصدار البون';
+    $('supervisorFirstWeight').value = record.firstWeight ?? '';
+    $('supervisorSecondWeight').value = record.secondWeight ?? '';
+    $('supervisorPlate').value = record.plate || '';
+    $('supervisorTrailer').value = record.trailer === '—' ? '' : (record.trailer || '');
+    $('supervisorDriver').value = record.driver === '—' ? '' : (record.driver || '');
+    $('supervisorCustomer').value = record.customer === '—' ? '' : (record.customer || '');
+    $('supervisorShipment').value = record.shipment === '—' ? '' : (record.shipment || '');
+    $('supervisorGovernorate').value = record.governorate === '—' ? '' : (record.governorate || '');
+    $('supervisorMovementType').value = record.movementType || 'وارد';
+    setSupervisorModalDateTime(record.createdAt || now());
+    updateSupervisorNetPreview();
+    $('supervisorFormMessage').textContent = 'عدّل البيانات المطلوبة ثم احفظ لإعادة إصدار البون وتحديث Excel.';
+    $('supervisorAddModal').classList.add('open');
+    $('supervisorFirstWeight').focus();
+  }
+
   function closeSupervisorAddModal() {
     $('supervisorAddModal').classList.remove('open');
+    editingSupervisorRecordId = null;
+    $('supervisorAddTitle').textContent = 'إضافة عملية وزن';
+    $('supervisorSaveRecord').textContent = 'حفظ وإصدار البون';
   }
 
   function updateSupervisorNetPreview() {
@@ -245,8 +283,17 @@
     const timestamp = operationDate.toISOString();
     const acceptedFirstWeight = Math.round(firstWeight * 100) / 100;
     const acceptedSecondWeight = Math.round(secondWeight * 100) / 100;
+    const isEditing = Boolean(editingSupervisorRecordId);
+    const existingRecord = isEditing
+      ? records.find(item => String(item.id) === String(editingSupervisorRecordId))
+      : null;
+    if (isEditing && !existingRecord) {
+      message.textContent = 'السجل المطلوب تعديله غير موجود. أغلق النافذة وحدّث السجلات.';
+      return;
+    }
     const record = {
-      id: ticketNo(),
+      ...(existingRecord || {}),
+      id: existingRecord?.id || ticketNo(),
       plate,
       trailer: $('supervisorTrailer').value.trim() || '—',
       driver: $('supervisorDriver').value.trim() || '—',
@@ -256,35 +303,43 @@
       movementType: $('supervisorMovementType').value || 'وارد',
       firstWeight: acceptedFirstWeight,
       secondWeight: acceptedSecondWeight,
-      firstOriginalWeight: null,
-      secondOriginalWeight: null,
-      firstAdjusted: false,
-      secondAdjusted: false,
-      firstSource: 'manual',
-      secondSource: 'manual',
       netWeight: Math.round(Math.abs(acceptedFirstWeight - acceptedSecondWeight) * 100) / 100,
       firstTime: timestamp,
       secondTime: timestamp,
       createdAt: timestamp,
-      createdByUserId: activeUser?.id || null,
-      createdByUserName: activeUser?.displayName || '',
-      createdByUsername: activeUser?.username || activeUser?.email || '',
-      source: 'إضافة المشرف'
+      createdByUserId: existingRecord?.createdByUserId || activeUser?.id || null,
+      createdByUserName: existingRecord?.createdByUserName || activeUser?.displayName || '',
+      createdByUsername: existingRecord?.createdByUsername || activeUser?.username || activeUser?.email || '',
+      source: existingRecord?.source || 'إضافة المشرف'
     };
     const submit = $('supervisorSaveRecord');
     submit.disabled = true;
-    message.textContent = 'جارٍ حفظ العملية...';
+    message.textContent = isEditing ? 'جارٍ حفظ التعديلات وتحديث Excel...' : 'جارٍ حفظ العملية...';
     try {
-      const savedRecord = await window.desktopBridge.addSupervisorRecord(record);
+      let savedRecord;
+      let excelSync = null;
+      if (isEditing) {
+        const result = await window.desktopBridge.updateSupervisorRecord(record.id, record);
+        savedRecord = result.record;
+        excelSync = result.excelSync || null;
+      } else {
+        savedRecord = await window.desktopBridge.addSupervisorRecord(record);
+      }
       records = readJSON(STORAGE_KEY, []);
       activeRecord = savedRecord;
       renderAll();
       closeSupervisorAddModal();
       $('supervisorAddForm').reset();
-      showToast('تم حفظ العملية وإصدار البون');
+      if (isEditing && excelSync?.ok === false) {
+        showToast('تم تعديل السجل وإصدار البون، لكن تعذر تحديث ملف Excel');
+      } else if (isEditing) {
+        showToast('تم تعديل السجل وتحديث Excel وإصدار البون');
+      } else {
+        showToast('تم حفظ العملية وإصدار البون');
+      }
       openTicket(savedRecord);
     } catch (error) {
-      message.textContent = error.message || 'تعذر حفظ العملية.';
+      message.textContent = error.message || (isEditing ? 'تعذر تعديل السجل.' : 'تعذر حفظ العملية.');
     } finally {
       submit.disabled = false;
     }
@@ -665,6 +720,9 @@
     const ownerCell = activeUser?.role === 'supervisor'
       ? '<td>'+esc(r.createdByUserName || 'غير محدد')+'</td>'
       : '';
+    const editAction = activeUser?.role === 'supervisor'
+      ? '<button class="table-action" data-edit-record="'+esc(r.id)+'">تعديل</button>'
+      : '';
     const deleteAction = activeUser?.role === 'supervisor'
       ? ''
       : '<button class="table-action delete-row-action" data-delete-record="'+esc(r.id)+'">حذف</button>';
@@ -672,10 +730,10 @@
       ? '<td><strong>'+esc(r.id)+'</strong></td>' + ownerCell + '<td>'+movement+'</td><td>'+esc(r.plate)+'</td><td>'+esc(r.trailer || '—')+'</td>' +
         '<td>'+esc(r.driver)+'</td><td>'+esc(r.customer)+'</td><td>'+esc(r.shipment || '—')+'</td><td>'+esc(r.governorate || '—')+'</td>' +
         '<td>'+fmt(r.firstWeight)+'</td><td>'+fmt(r.secondWeight)+'</td><td><strong class="net-cell">'+fmt(r.netWeight)+'</strong></td><td>'+stamp(new Date(r.createdAt))+'</td>' +
-        '<td><div class="table-actions"><button class="table-action" data-ticket="'+esc(r.id)+'">التذكرة</button><button class="table-action" data-export-ticket="'+esc(r.id)+'">تصدير Excel</button>'+deleteAction+'</div></td>'
+        '<td><div class="table-actions">'+editAction+'<button class="table-action" data-ticket="'+esc(r.id)+'">التذكرة</button><button class="table-action" data-export-ticket="'+esc(r.id)+'">تصدير Excel</button>'+deleteAction+'</div></td>'
       : '<td><strong>'+esc(r.id)+'</strong></td><td>'+movement+'</td><td>'+esc(r.plate)+'</td><td>'+esc(r.trailer || '—')+'</td>' +
         '<td>'+esc(r.customer)+'</td><td>'+esc(r.driver)+'</td><td>'+esc(r.shipment || '—')+'</td><td><strong class="net-cell">'+fmt(r.netWeight)+'</strong></td><td>'+stamp(new Date(r.createdAt))+'</td>' +
-        '<td><button class="table-action" data-export-ticket="'+esc(r.id)+'">تصدير ملف Excel</button></td>';
+        '<td><div class="table-actions">'+editAction+'<button class="table-action" data-export-ticket="'+esc(r.id)+'">تصدير ملف Excel</button></div></td>';
     return '<tr>'+cells+'</tr>';
   }
   function searchRecords(query, sourceRecords = records) {
@@ -1749,6 +1807,8 @@
   $('printTicket').addEventListener('click',()=>window.print());
   $('ticketModal').addEventListener('click',e=>{if(e.target===$('ticketModal'))$('ticketModal').classList.remove('open');});
   document.addEventListener('click',e=>{
+    const editButton = e.target.closest('[data-edit-record]');
+    if (editButton) { openSupervisorEditModal(editButton.dataset.editRecord); return; }
     const deleteButton = e.target.closest('[data-delete-record]');
     if (deleteButton) { deleteRecord(deleteButton.dataset.deleteRecord); return; }
     if (e.target.closest('[data-delete-all-records]')) { deleteAllRecords(); return; }

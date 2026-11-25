@@ -8,6 +8,7 @@ contextBridge.exposeInMainWorld('desktopBridge', {
   updateAccount: input => ipcRenderer.invoke('auth:update-account', input),
   listUsers: () => ipcRenderer.invoke('auth:users'),
   addSupervisorRecord: record => ipcRenderer.invoke('tickets:add-supervisor-record', record),
+  updateSupervisorRecord: (recordId, record) => ipcRenderer.invoke('tickets:update-supervisor-record', recordId, record),
   logout: () => ipcRenderer.invoke('auth:logout'),
   nextTicketId: () => ipcRenderer.sendSync('tickets:next-id'),
   getItem: key => ipcRenderer.sendSync('local-store:get', key),

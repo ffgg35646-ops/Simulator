@@ -398,6 +398,68 @@ function registerAuthHandlers() {
     return record;
   });
 
+  ipcMain.handle('tickets:update-supervisor-record', (_event, recordId, input = {}) => {
+    if (!authSession || authSession.role !== 'supervisor') throw new Error('تعديل السجلات متاح للمشرف فقط.');
+    const id = String(recordId || '').trim();
+    const plate = String(input.plate || '').trim();
+    const createdAt = String(input.createdAt || '');
+    const firstWeight = Number(input.firstWeight);
+    const secondWeight = Number(input.secondWeight);
+    if (!id || !plate) throw new Error('رقم السجل ورقم السيارة مطلوبان.');
+    if (!Number.isFinite(Date.parse(createdAt))) throw new Error('تاريخ ووقت العملية غير صحيحين.');
+    if (![firstWeight, secondWeight].every(value => Number.isFinite(value) && value >= 0 && value <= 500000)) {
+      throw new Error('قيم الوزن يجب أن تكون من 0 إلى 500,000 كجم.');
+    }
+    const allRecords = getStoredRecords();
+    const existingIndex = allRecords.findIndex(record => String(record.id) === id);
+    if (existingIndex < 0) throw new Error('السجل المطلوب تعديله غير موجود.');
+    const existing = allRecords[existingIndex];
+    const acceptedFirstWeight = Math.round(firstWeight * 100) / 100;
+    const acceptedSecondWeight = Math.round(secondWeight * 100) / 100;
+    const firstChanged = Number(existing.firstWeight) !== acceptedFirstWeight;
+    const secondChanged = Number(existing.secondWeight) !== acceptedSecondWeight;
+    const updatedRecord = {
+      ...existing,
+      plate: plate.slice(0, 80),
+      trailer: String(input.trailer || '—').trim().slice(0, 80) || '—',
+      driver: String(input.driver || '—').trim().slice(0, 120) || '—',
+      customer: String(input.customer || '—').trim().slice(0, 120) || '—',
+      shipment: String(input.shipment || '—').trim().slice(0, 160) || '—',
+      governorate: String(input.governorate || '—').trim().slice(0, 80) || '—',
+      movementType: ['وارد', 'صادر'].includes(String(input.movementType || '')) ? String(input.movementType) : existing.movementType || 'وارد',
+      firstWeight: acceptedFirstWeight,
+      secondWeight: acceptedSecondWeight,
+      firstOriginalWeight: firstChanged
+        ? (existing.firstOriginalWeight ?? existing.firstWeight)
+        : (existing.firstOriginalWeight ?? null),
+      secondOriginalWeight: secondChanged
+        ? (existing.secondOriginalWeight ?? existing.secondWeight)
+        : (existing.secondOriginalWeight ?? null),
+      firstAdjusted: Boolean(existing.firstAdjusted || firstChanged),
+      secondAdjusted: Boolean(existing.secondAdjusted || secondChanged),
+      netWeight: Math.round(Math.abs(acceptedFirstWeight - acceptedSecondWeight) * 100) / 100,
+      firstTime: createdAt,
+      secondTime: createdAt,
+      createdAt,
+      updatedAt: new Date().toISOString(),
+      lastEditedByUserId: authSession.id,
+      lastEditedByUserName: authSession.displayName
+    };
+    const updatedRows = allRecords.map((record, index) => index === existingIndex ? updatedRecord : record)
+      .sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+    const saveRecords = db.prepare(`INSERT INTO app_kv(key,value,updated_at) VALUES(?,?,CURRENT_TIMESTAMP)
+      ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=CURRENT_TIMESTAMP`);
+    const insertRecord = db.prepare('INSERT OR REPLACE INTO weight_records(id,payload,created_at) VALUES(?,?,?)');
+    const tx = db.transaction(rows => {
+      saveRecords.run(RECORDS_KEY, JSON.stringify(rows));
+      db.prepare('DELETE FROM weight_records').run();
+      for (const item of rows) insertRecord.run(String(item.id), JSON.stringify(item), String(item.createdAt || new Date().toISOString()));
+    });
+    tx(updatedRows);
+    const excelSync = syncExcelRecords(updatedRows);
+    return { record: updatedRecord, excelSync };
+  });
+
   ipcMain.handle('auth:logout', async () => {
     authSession = null;
     if (serialDevice?.isOpen) {
