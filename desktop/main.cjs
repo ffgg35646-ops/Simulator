@@ -305,7 +305,7 @@ function registerAuthHandlers() {
       const next = { count: (attempts?.count || 0) + 1, lockedUntil: 0 };
       if (next.count >= 5) { next.count = 0; next.lockedUntil = Date.now() + 60000; }
       loginFailures.set(attemptKey, next);
-      throw new Error('اسم المستخدم أو كلمة المرور غير صحيحة.');
+      throw new Error('بياناتك غلط. راجع اسم المستخدم وكلمة المرور.');
     }
     loginFailures.delete(attemptKey);
     authSession = publicUser(account);
@@ -324,10 +324,78 @@ function registerAuthHandlers() {
     return authSession;
   });
 
+  ipcMain.handle('auth:update-account', (_event, input = {}) => {
+    if (!authSession) throw new Error('سجّل الدخول أولًا.');
+    const displayName = String(input.displayName || '').trim();
+    const password = String(input.password || '');
+    if (displayName.length < 2 || displayName.length > 80) throw new Error('اكتب اسمًا صحيحًا من حرفين إلى 80 حرفًا.');
+    if (password && password.length < 10) throw new Error('كلمة المرور الجديدة يجب ألا تقل عن 10 أحرف.');
+    if (password) {
+      const salt = crypto.randomBytes(16).toString('hex');
+      db.prepare('UPDATE app_users SET display_name=?, password_salt=?, password_hash=?, must_change_password=0 WHERE id=?')
+        .run(displayName, salt, passwordHash(password, salt), authSession.id);
+    } else {
+      db.prepare('UPDATE app_users SET display_name=? WHERE id=?').run(displayName, authSession.id);
+    }
+    const row = db.prepare('SELECT * FROM app_users WHERE id=?').get(authSession.id);
+    authSession = publicUser(row);
+    return authSession;
+  });
+
   ipcMain.handle('auth:users', () => {
     if (!authSession || authSession.role !== 'supervisor') throw new Error('هذه القائمة متاحة للمشرف فقط.');
     return db.prepare("SELECT id,username,display_name FROM app_users WHERE role='operator' ORDER BY created_at,id")
       .all().map(row => ({ id: row.id, username: row.username, displayName: row.display_name }));
+  });
+
+  ipcMain.handle('tickets:add-supervisor-record', (_event, input = {}) => {
+    if (!authSession || authSession.role !== 'supervisor') throw new Error('إضافة العمليات اليدوية متاحة للمشرف فقط.');
+    const id = String(input.id || '').trim();
+    const plate = String(input.plate || '').trim();
+    const createdAt = String(input.createdAt || '');
+    const firstWeight = Number(input.firstWeight);
+    const secondWeight = Number(input.secondWeight);
+    if (!id || !plate) throw new Error('بيانات التذكرة غير مكتملة.');
+    if (!Number.isFinite(Date.parse(createdAt))) throw new Error('تاريخ ووقت العملية غير صحيحين.');
+    if (![firstWeight, secondWeight].every(value => Number.isFinite(value) && value >= 0 && value <= 500000)) {
+      throw new Error('قيم الوزن يجب أن تكون من 0 إلى 500,000 كجم.');
+    }
+    const allRecords = getStoredRecords();
+    if (allRecords.some(record => String(record.id) === id)) throw new Error('رقم التذكرة مستخدم بالفعل. حاول الحفظ مرة أخرى.');
+    const acceptedFirstWeight = Math.round(firstWeight * 100) / 100;
+    const acceptedSecondWeight = Math.round(secondWeight * 100) / 100;
+    const record = {
+      ...input,
+      id,
+      plate,
+      firstWeight: acceptedFirstWeight,
+      secondWeight: acceptedSecondWeight,
+      netWeight: Math.round(Math.abs(acceptedFirstWeight - acceptedSecondWeight) * 100) / 100,
+      firstTime: createdAt,
+      secondTime: createdAt,
+      createdAt,
+      createdByUserId: authSession.id,
+      createdByUserName: authSession.displayName,
+      createdByUsername: authSession.username || authSession.email || '',
+      firstSource: 'manual',
+      secondSource: 'manual',
+      firstAdjusted: false,
+      secondAdjusted: false,
+      source: 'إضافة المشرف'
+    };
+    allRecords.push(record);
+    allRecords.sort((a, b) => new Date(b.createdAt || 0).getTime() - new Date(a.createdAt || 0).getTime());
+    const saveRecords = db.prepare(`INSERT INTO app_kv(key,value,updated_at) VALUES(?,?,CURRENT_TIMESTAMP)
+      ON CONFLICT(key) DO UPDATE SET value=excluded.value, updated_at=CURRENT_TIMESTAMP`);
+    const insertRecord = db.prepare('INSERT OR REPLACE INTO weight_records(id,payload,created_at) VALUES(?,?,?)');
+    const tx = db.transaction(rows => {
+      saveRecords.run(RECORDS_KEY, JSON.stringify(rows));
+      db.prepare('DELETE FROM weight_records').run();
+      for (const item of rows) insertRecord.run(String(item.id), JSON.stringify(item), String(item.createdAt || new Date().toISOString()));
+    });
+    tx(allRecords);
+    syncExcelRecords(allRecords);
+    return record;
   });
 
   ipcMain.handle('auth:logout', async () => {
