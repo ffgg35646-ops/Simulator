@@ -204,12 +204,14 @@ html.desktop-auth-required .app-shell{display:none!important}
 }
 
 /* Operation details: two equal fields per row, matching the weighing inputs. */
-#ticketDetailsFields.form-grid{
+#ticketDetailsFields.form-grid,
+#supervisorTicketDetailsFields.form-grid{
   grid-template-columns:repeat(2,minmax(0,1fr));
   column-gap:12px;
   row-gap:12px;
 }
-#ticketDetailsFields.form-grid>label{
+#ticketDetailsFields.form-grid>label,
+#supervisorTicketDetailsFields.form-grid>label{
   grid-column:auto;
   display:grid;
   align-content:start;
@@ -217,7 +219,9 @@ html.desktop-auth-required .app-shell{display:none!important}
   min-width:0;
 }
 #ticketDetailsFields.form-grid input,
-#ticketDetailsFields.form-grid select{
+#ticketDetailsFields.form-grid select,
+#supervisorTicketDetailsFields.form-grid input,
+#supervisorTicketDetailsFields.form-grid select{
   width:100%;
   min-width:0;
   min-height:54px;
@@ -229,9 +233,12 @@ html.desktop-auth-required .app-shell{display:none!important}
 #ticketDetailsFields .vehicle-number-field,
 #ticketDetailsFields .trailer-number-field{grid-row:auto}
 @media(max-width:560px){
-  #ticketDetailsFields.form-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
+  #ticketDetailsFields.form-grid,
+  #supervisorTicketDetailsFields.form-grid{grid-template-columns:repeat(2,minmax(0,1fr));gap:9px}
   #ticketDetailsFields.form-grid input,
-  #ticketDetailsFields.form-grid select{min-height:54px;height:54px;font-size:12px;padding:9px 7px}
+  #ticketDetailsFields.form-grid select,
+  #supervisorTicketDetailsFields.form-grid input,
+  #supervisorTicketDetailsFields.form-grid select{min-height:54px;height:54px;font-size:12px;padding:9px 7px}
 }
 
 /* Operator Windows accounts use one full-width operating screen. Supervisor UI is unchanged. */
@@ -426,4 +433,81 @@ html.operator-dashboard-only .operator-logout-button[hidden]{
 .operator-logout-button:focus-visible{
   outline:2px solid #91a4ae;
   outline-offset:2px;
+}
+
+
+/* Small self-service account controls for both signed-in roles. */
+.account-settings-button,.operator-account-button{
+  background:#1b2d38;
+  border-color:#3a525f;
+  color:#d7e5e9;
+  padding:7px 11px;
+  font-size:10px;
+}
+.account-settings-button:hover,.operator-account-button:hover{
+  background:#243b47;
+  border-color:#4d7c7c;
+  color:#fff;
+}
+.operator-account-button{
+  position:absolute;
+  right:0;
+  top:50%;
+  transform:translateY(-50%);
+}
+.account-settings-card{
+  width:min(450px,100%);
+  max-height:calc(100vh - 32px);
+  overflow:auto;
+  padding:22px;
+  background:#13212b;
+  border:1px solid #2c424f;
+  border-radius:15px;
+  color:#edf5f6;
+  box-shadow:0 25px 90px #0008;
+}
+.account-settings-card .modal-heading{border-color:#2b414e}
+.account-settings-card .modal-heading h3{color:#edf5f6;font-size:15px}
+.account-settings-card .modal-heading button{color:#b9cbd1}
+.account-settings-form{display:grid;gap:13px;padding-top:17px}
+.account-settings-form label,.supervisor-add-form label{
+  display:grid;gap:6px;color:#aebfc7;font-size:10px;min-width:0;
+}
+.account-settings-form label small{display:block;color:#7f969f;font-size:9px}
+.account-settings-form input,.supervisor-add-form input,.supervisor-add-form select{
+  width:100%;min-width:0;height:48px;min-height:48px;padding:10px 12px;
+  border:1px solid #304753;border-radius:8px;background:#0d1820;color:#edf4f7;
+  outline:none;font:inherit;font-size:12px;
+}
+.account-settings-form input:focus,.supervisor-add-form input:focus,.supervisor-add-form select:focus{
+  border-color:#29b9ae;box-shadow:0 0 0 3px #20c6b715;
+}
+.account-form-message{min-height:18px;margin:0;color:#65d6c8;font-size:10px;line-height:1.8}
+.account-form-message.is-error{color:#f2a0a0}
+.account-form-actions{display:flex;gap:9px;justify-content:flex-start}
+.supervisor-add-modal{
+  width:min(820px,100%);max-height:calc(100vh - 32px);overflow:auto;padding:22px;
+  background:#13212b;border:1px solid #2c424f;border-radius:15px;color:#edf5f6;
+  box-shadow:0 25px 90px #0008;
+}
+.supervisor-add-modal .modal-heading{border-color:#2b414e;margin-bottom:15px}
+.supervisor-add-modal .modal-heading h3{color:#edf5f6;font-size:15px}
+.supervisor-add-modal .modal-heading button{color:#b9cbd1}
+.supervisor-add-form .manual-entry{margin-top:0}
+.supervisor-add-form .manual-weight-row.weight-input-pair input{height:60px;min-height:60px}
+.supervisor-add-form .form-grid{margin-top:12px}
+.supervisor-add-form .form-grid input,.supervisor-add-form .form-grid select{height:54px;min-height:54px}
+.supervisor-datetime-row{
+  display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px;margin-top:15px;
+}
+.supervisor-datetime-row input{direction:ltr;text-align:center}
+.supervisor-add-form .capture-buttons{justify-content:flex-start}
+@media(max-width:560px){
+  .account-settings-card,.supervisor-add-modal{padding:16px}
+  .supervisor-datetime-row{grid-template-columns:1fr 1fr;gap:8px}
+  .supervisor-add-form .capture-buttons,.account-form-actions{flex-direction:column}
+  .supervisor-add-form .capture-buttons .btn,.account-form-actions .btn{width:100%}
+}
+@media print{
+  #accountSettingsModal,#supervisorAddModal{display:none!important}
 }
