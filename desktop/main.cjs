@@ -242,7 +242,7 @@ function registerAuthHandlers() {
       password: String(input.supervisor?.password || '')
     };
     if (user1.username.length < 3 || user2.username.length < 3) throw new Error('اسم المستخدم يجب أن يتكون من 3 أحرف على الأقل.');
-    if (user1.password.length < 8 || user2.password.length < 8 || supervisor.password.length < 8) throw new Error('كل كلمة مرور يجب أن تكون 8 أحرف على الأقل.');
+    if (user1.password.length < 3 || user2.password.length < 3 || supervisor.password.length < 3) throw new Error('كل كلمة مرور يجب أن تكون 3 أحرف على الأقل.');
     if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(supervisor.email)) throw new Error('أدخل بريدًا إلكترونيًا صحيحًا للمشرف.');
     const identifiers = [user1.username.toLowerCase(), user2.username.toLowerCase(), supervisor.email];
     if (new Set(identifiers).size !== identifiers.length) throw new Error('أسماء المستخدمين والبريد الإلكتروني يجب أن تكون مختلفة.');
@@ -315,7 +315,7 @@ function registerAuthHandlers() {
   ipcMain.handle('auth:change-password', (_event, input = {}) => {
     if (!authSession) throw new Error('سجّل الدخول أولًا.');
     const password = String(input.password || '');
-    if (password.length < 10) throw new Error('كلمة المرور الجديدة يجب ألا تقل عن 10 أحرف.');
+    if (password.length < 3) throw new Error('كلمة المرور الجديدة يجب ألا تقل عن 3 أحرف.');
     const salt = crypto.randomBytes(16).toString('hex');
     db.prepare('UPDATE app_users SET password_salt=?, password_hash=?, must_change_password=0 WHERE id=?')
       .run(salt, passwordHash(password, salt), authSession.id);
@@ -329,7 +329,7 @@ function registerAuthHandlers() {
     const displayName = String(input.displayName || '').trim();
     const password = String(input.password || '');
     if (displayName.length < 2 || displayName.length > 80) throw new Error('اكتب اسمًا صحيحًا من حرفين إلى 80 حرفًا.');
-    if (password && password.length < 10) throw new Error('كلمة المرور الجديدة يجب ألا تقل عن 10 أحرف.');
+    if (password && password.length < 3) throw new Error('كلمة المرور الجديدة يجب ألا تقل عن 3 أحرف.');
     if (password) {
       const salt = crypto.randomBytes(16).toString('hex');
       db.prepare('UPDATE app_users SET display_name=?, password_salt=?, password_hash=?, must_change_password=0 WHERE id=?')

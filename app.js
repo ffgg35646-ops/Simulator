@@ -1867,8 +1867,8 @@
       $('accountDisplayName').focus();
       return;
     }
-    if (password && password.length < 10) {
-      message.textContent = 'كلمة المرور الجديدة يجب ألا تقل عن 10 أحرف.';
+    if (password && password.length < 3) {
+      message.textContent = 'كلمة المرور الجديدة يجب ألا تقل عن 3 أحرف.';
       message.classList.add('is-error');
       $('accountNewPassword').focus();
       return;
@@ -2003,8 +2003,8 @@
   $('authChangeForm').addEventListener('submit', async event => {
     event.preventDefault();
     const password = $('authNewPassword').value;
-    if (password.length < 10) {
-      setAuthMessage('change', 'كلمة المرور الجديدة يجب ألا تقل عن 10 أحرف.');
+    if (password.length < 3) {
+      setAuthMessage('change', 'كلمة المرور الجديدة يجب ألا تقل عن 3 أحرف.');
       return;
     }
     if (password !== $('authNewPasswordConfirm').value) {

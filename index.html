@@ -31,13 +31,13 @@
 
       <div id="authChangePanel" hidden>
         <h1>تغيير كلمة المرور المؤقتة</h1>
-        <p class="auth-description">لأمان الحساب، غيّر كلمة المرور المؤقتة قبل الدخول إلى لوحة التشغيل. لا تقل كلمة المرور الجديدة عن 10 أحرف.</p>
+        <p class="auth-description">لأمان الحساب، غيّر كلمة المرور المؤقتة قبل الدخول إلى لوحة التشغيل. كلمة المرور الجديدة يجب ألا تقل عن 3 أحرف.</p>
         <form id="authChangeForm" class="auth-form">
           <label>كلمة المرور الجديدة
-            <input id="authNewPassword" type="password" autocomplete="new-password" minlength="10" required />
+            <input id="authNewPassword" type="password" autocomplete="new-password" minlength="3" required />
           </label>
           <label>تأكيد كلمة المرور الجديدة
-            <input id="authNewPasswordConfirm" type="password" autocomplete="new-password" minlength="10" required />
+            <input id="authNewPasswordConfirm" type="password" autocomplete="new-password" minlength="3" required />
           </label>
           <button class="btn btn-primary btn-large" type="submit" id="authChangeSubmit">حفظ كلمة المرور والدخول</button>
           <p class="auth-message" id="authChangeMessage" role="status"></p>
@@ -353,10 +353,10 @@
           <input id="accountDisplayName" type="text" maxlength="80" autocomplete="name" required />
         </label>
         <label>كلمة المرور الجديدة <small>اتركها فارغة إذا كنت لا تريد تغييرها</small>
-          <input id="accountNewPassword" type="password" minlength="10" autocomplete="new-password" placeholder="10 أحرف على الأقل" />
+          <input id="accountNewPassword" type="password" minlength="3" autocomplete="new-password" placeholder="3 أحرف على الأقل" />
         </label>
         <label>تأكيد كلمة المرور الجديدة
-          <input id="accountNewPasswordConfirm" type="password" minlength="10" autocomplete="new-password" placeholder="أعد كتابة كلمة المرور الجديدة" />
+          <input id="accountNewPasswordConfirm" type="password" minlength="3" autocomplete="new-password" placeholder="أعد كتابة كلمة المرور الجديدة" />
         </label>
         <p class="account-form-message" id="accountSettingsMessage" role="status"></p>
         <div class="account-form-actions"><button class="btn btn-primary" id="saveAccountSettings" type="submit">حفظ التغييرات</button><button class="btn btn-outline" id="cancelAccountSettings" type="button">إلغاء</button></div>
