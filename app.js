@@ -377,6 +377,22 @@
     updateCaptureUI();
     $('plateInput').focus();
   }
+  function printTicketOnly() {
+    const body = document.body;
+    const cleanup = () => body.classList.remove('printing-ticket');
+
+    body.classList.add('printing-ticket');
+    window.addEventListener('afterprint', cleanup, { once: true });
+
+    try {
+      window.print();
+    } catch (error) {
+      window.removeEventListener('afterprint', cleanup);
+      cleanup();
+      showToast('تعذر فتح نافذة طباعة التذكرة.');
+    }
+  }
+
   function openTicket(record) {
     activeRecord = record;
     $('ticketContent').innerHTML = ticketMarkup(record);
@@ -1804,7 +1820,7 @@
   $('printReport').addEventListener('click',()=>window.print());
   $('closeTicket').addEventListener('click',()=>$('ticketModal').classList.remove('open'));
   $('closeTicket2').addEventListener('click',()=>$('ticketModal').classList.remove('open'));
-  $('printTicket').addEventListener('click',()=>window.print());
+  $('printTicket').addEventListener('click',printTicketOnly);
   $('ticketModal').addEventListener('click',e=>{if(e.target===$('ticketModal'))$('ticketModal').classList.remove('open');});
   document.addEventListener('click',e=>{
     const editButton = e.target.closest('[data-edit-record]');
