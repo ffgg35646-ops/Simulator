@@ -511,3 +511,49 @@ html.operator-dashboard-only .operator-logout-button[hidden]{
 @media print{
   #accountSettingsModal,#supervisorAddModal{display:none!important}
 }
+
+
+/* طباعة البون فقط: لا تطبع شاشة الميزان أو التقارير والإحصائيات خلف النافذة. */
+@media print {
+  body.printing-ticket * {
+    visibility: hidden !important;
+  }
+
+  body.printing-ticket #ticketModal,
+  body.printing-ticket #ticketModal * {
+    visibility: visible !important;
+  }
+
+  body.printing-ticket #ticketModal {
+    display: block !important;
+    position: absolute !important;
+    inset: 0 !important;
+    z-index: 99999 !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    background: transparent !important;
+  }
+
+  body.printing-ticket #ticketModal .ticket-modal {
+    display: block !important;
+    width: 100% !important;
+    max-width: none !important;
+    margin: 0 !important;
+    padding: 0 !important;
+    border: 0 !important;
+    border-radius: 0 !important;
+    box-shadow: none !important;
+    background: #fff !important;
+  }
+
+  body.printing-ticket #ticketModal .modal-heading,
+  body.printing-ticket #ticketModal .modal-actions {
+    display: none !important;
+  }
+
+  body.printing-ticket #ticketModal .ticket-paper {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    color: #111 !important;
+  }
+}
