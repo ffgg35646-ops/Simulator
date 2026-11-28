@@ -1936,6 +1936,78 @@
     }
   }
 
+  function openSupervisorUserModal() {
+    if (activeUser?.role !== 'supervisor') return;
+    $('supervisorUserForm').reset();
+    const message = $('supervisorUserMessage');
+    message.textContent = '';
+    message.classList.remove('is-error');
+    $('supervisorUserModal').classList.add('open');
+    $('supervisorUserDisplayName').focus();
+  }
+
+  function closeSupervisorUserModal() {
+    $('supervisorUserModal').classList.remove('open');
+  }
+
+  $('supervisorAddUser').addEventListener('click', openSupervisorUserModal);
+  $('closeSupervisorUser').addEventListener('click', closeSupervisorUserModal);
+  $('cancelSupervisorUser').addEventListener('click', closeSupervisorUserModal);
+  $('supervisorUserModal').addEventListener('click', event => {
+    if (event.target === $('supervisorUserModal')) closeSupervisorUserModal();
+  });
+  $('supervisorUserForm').addEventListener('submit', async event => {
+    event.preventDefault();
+    if (activeUser?.role !== 'supervisor') return;
+
+    const displayName = $('supervisorUserDisplayName').value.trim();
+    const username = $('supervisorUserUsername').value.trim();
+    const password = $('supervisorUserPassword').value;
+    const confirmation = $('supervisorUserPasswordConfirm').value;
+    const message = $('supervisorUserMessage');
+    message.classList.remove('is-error');
+
+    if (displayName.length < 2 || displayName.length > 80) {
+      message.textContent = 'اكتب اسمًا ظاهرًا من حرفين إلى 80 حرفًا.';
+      message.classList.add('is-error');
+      $('supervisorUserDisplayName').focus();
+      return;
+    }
+    if (username.length < 3 || username.length > 64) {
+      message.textContent = 'اسم المستخدم يجب أن يكون من 3 إلى 64 حرفًا.';
+      message.classList.add('is-error');
+      $('supervisorUserUsername').focus();
+      return;
+    }
+    if (password.length < 3 || password.length > 128) {
+      message.textContent = 'كلمة المرور يجب أن تكون من 3 إلى 128 حرفًا.';
+      message.classList.add('is-error');
+      $('supervisorUserPassword').focus();
+      return;
+    }
+    if (password !== confirmation) {
+      message.textContent = 'تأكيد كلمة المرور غير مطابق.';
+      message.classList.add('is-error');
+      $('supervisorUserPasswordConfirm').focus();
+      return;
+    }
+
+    const submit = $('saveSupervisorUser');
+    submit.disabled = true;
+    message.textContent = 'جارٍ إنشاء حساب المستخدم...';
+    try {
+      const createdUser = await window.desktopBridge.addUser({ displayName, username, password });
+      closeSupervisorUserModal();
+      await populateSupervisorUsers();
+      showToast('تم إنشاء حساب ' + createdUser.displayName + ' بنجاح');
+    } catch (error) {
+      message.textContent = error.message || 'تعذر إنشاء حساب المستخدم.';
+      message.classList.add('is-error');
+    } finally {
+      submit.disabled = false;
+    }
+  });
+
   function configureRoleUI() {
     const isSupervisor = activeUser?.role === 'supervisor';
     const isOperator = activeUser?.role === 'operator';
@@ -1948,6 +2020,7 @@
     });
     $('supervisorReportControls').hidden = !isSupervisor;
     $('supervisorAddRecord').hidden = !isSupervisor;
+    $('supervisorAddUser').hidden = !isSupervisor;
     $('accountSettingsButton').hidden = !isSupervisor;
     $('operatorAccountSettingsButton').hidden = !isOperator;
     $('reportUserHeader').hidden = !isSupervisor;
@@ -2062,6 +2135,8 @@
     $('accountSettingsButton').hidden = true;
     $('operatorAccountSettingsButton').hidden = true;
     $('supervisorAddRecord').hidden = true;
+    $('supervisorAddUser').hidden = true;
+    closeSupervisorUserModal();
     closeAccountSettings();
     closeSupervisorAddModal();
     document.documentElement.classList.remove('operator-dashboard-only');
