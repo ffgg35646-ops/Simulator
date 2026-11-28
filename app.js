@@ -2105,6 +2105,18 @@ th { background:#e9edf0 !important; font-weight:bold; } tr { break-inside:avoid;
     }
   }
 
+  document.querySelectorAll('[data-toggle-password]').forEach(toggle => {
+    toggle.addEventListener('click', () => {
+      const field = $(toggle.dataset.togglePassword);
+      if (!field) return;
+      const showing = field.type === 'password';
+      field.type = showing ? 'text' : 'password';
+      toggle.setAttribute('aria-pressed', String(showing));
+      toggle.setAttribute('aria-label', showing ? 'إخفاء كلمة المرور' : 'إظهار كلمة المرور');
+      field.focus();
+    });
+  });
+
   $('authLoginForm').addEventListener('submit', async event => {
     event.preventDefault();
     const submit = $('authLoginSubmit');
