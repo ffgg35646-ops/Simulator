@@ -430,7 +430,10 @@
           <input id="supervisorUserDisplayName" type="text" minlength="2" maxlength="80" autocomplete="name" placeholder="اسم المستخدم" required />
         </label>
         <label>كلمة المرور
-          <input id="supervisorUserPassword" type="password" minlength="3" maxlength="128" autocomplete="new-password" placeholder="كلمة المرور" required />
+          <div class="password-field">
+            <input id="supervisorUserPassword" type="password" minlength="3" maxlength="128" autocomplete="new-password" placeholder="كلمة المرور" required />
+            <button class="password-visibility" type="button" data-toggle-password="supervisorUserPassword" aria-label="إظهار كلمة المرور" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg></button>
+          </div>
         </label>
         <p class="account-form-message" id="supervisorUserMessage" role="status"></p>
         <div class="account-form-actions">
