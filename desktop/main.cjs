@@ -302,7 +302,13 @@ function registerAuthHandlers() {
       const seconds = Math.ceil((attempts.lockedUntil - Date.now()) / 1000);
       throw new Error('محاولات كثيرة غير صحيحة. حاول بعد ' + seconds + ' ثانية.');
     }
-    const account = db.prepare('SELECT * FROM app_users WHERE username = ? COLLATE NOCASE OR email = ? COLLATE NOCASE').get(identifier, identifier);
+    let account = db.prepare('SELECT * FROM app_users WHERE username = ? COLLATE NOCASE OR email = ? COLLATE NOCASE').get(identifier, identifier);
+    if (!account) {
+      // Backward compatibility: older versions changed display_name but left username untouched.
+      // Accept a display name for login only when it resolves to exactly one account.
+      const displayNameMatches = db.prepare('SELECT * FROM app_users WHERE display_name = ? COLLATE NOCASE LIMIT 2').all(identifier);
+      if (displayNameMatches.length === 1) account = displayNameMatches[0];
+    }
     const supplied = passwordHash(password, account?.password_salt || 'unknown-account-salt');
     const expected = account?.password_hash || '0'.repeat(128);
     const valid = Boolean(account) && crypto.timingSafeEqual(Buffer.from(supplied, 'hex'), Buffer.from(expected, 'hex'));
