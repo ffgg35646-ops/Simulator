@@ -2245,7 +2245,12 @@ th { background:#e9edf0 !important; font-weight:bold; } tr { break-inside:avoid;
       $('authPassword').value = '';
       await enterAuthenticatedApp(user);
     } catch (error) {
-      setAuthMessage('login', error.message || 'تعذر تسجيل الدخول.');
+      const loginError = String(error?.message || error || '');
+      const technicalLoginError = /api\\/login|unexpected end of json input|json\\.parse|syntaxerror/i.test(loginError);
+      const friendlyMessage = technicalLoginError
+        ? 'اسم المستخدم أو كلمة المرور غير صحيحة، برجاء التأكد من البيانات والمحاولة مرة أخرى.'
+        : (loginError || 'تعذر تسجيل الدخول. حاول مرة أخرى.');
+      setAuthMessage('login', friendlyMessage);
     } finally {
       submit.disabled = false;
     }
