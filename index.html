@@ -12,17 +12,16 @@
 <body>
   <section class="auth-gate" id="authGate" hidden>
     <div class="auth-card">
-      <div class="auth-brand"><span class="auth-brand-mark">W120</span><div><strong>نظام الميزان البسكول</strong><small>دخول المستخدمين والمشرف</small></div></div>
+      <div class="auth-brand"><strong class="auth-brand-name">الميزان</strong></div>
 
       <div id="authLoginPanel" hidden>
         <h1>تسجيل الدخول</h1>
-        <p class="auth-description">اكتب بيانات الحساب للمتابعة إلى البرنامج.</p>
         <form id="authLoginForm" class="auth-form">
-          <label>اسم المستخدم أو الاسم الذي حدده المشرف
-            <input id="authIdentifier" autocomplete="username" placeholder="اكتب اسم المستخدم أو الاسم الذي حدده المشرف" required />
+          <label>
+            <input id="authIdentifier" autocomplete="username" aria-label="اسم المستخدم" placeholder="اسم المستخدم" required />
           </label>
-          <label>كلمة المرور
-            <div class="password-field"><input id="authPassword" type="password" autocomplete="current-password" placeholder="كلمة المرور" required /><button class="password-visibility" type="button" data-toggle-password="authPassword" aria-label="إظهار كلمة المرور" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg></button></div>
+          <label>
+            <div class="password-field"><input id="authPassword" type="password" autocomplete="current-password" aria-label="كلمة المرور" placeholder="كلمة المرور" required /><button class="password-visibility" type="button" data-toggle-password="authPassword" aria-label="إظهار كلمة المرور" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg></button></div>
           </label>
           <button class="btn btn-primary btn-large" type="submit" id="authLoginSubmit">دخول إلى البرنامج</button>
           <p class="auth-message" id="authLoginMessage" role="status"></p>
