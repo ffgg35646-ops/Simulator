@@ -358,27 +358,24 @@ function registerAuthHandlers() {
     if (!authSession || authSession.role !== 'supervisor') throw new Error('إضافة المستخدمين متاحة للمشرف فقط.');
 
     const displayName = String(input.displayName || '').trim();
-    const username = String(input.username || '').trim();
+    const username = displayName;
     const password = String(input.password || '');
 
     if (displayName.length < 2 || displayName.length > 80) {
-      throw new Error('الاسم الظاهر يجب أن يكون من حرفين إلى 80 حرفًا.');
-    }
-    if (username.length < 3 || username.length > 64) {
-      throw new Error('اسم المستخدم يجب أن يكون من 3 إلى 64 حرفًا.');
+      throw new Error('الاسم يجب أن يكون من حرفين إلى 80 حرفًا.');
     }
     if (password.length < 3 || password.length > 128) {
       throw new Error('كلمة المرور يجب أن تكون من 3 إلى 128 حرفًا.');
     }
 
-    const existing = db.prepare('SELECT id FROM app_users WHERE username = ? COLLATE NOCASE OR email = ? COLLATE NOCASE')
-      .get(username, username);
-    if (existing) throw new Error('اسم المستخدم مستخدم بالفعل. اختر اسمًا آخر.');
+    const existing = db.prepare('SELECT id FROM app_users WHERE username = ? COLLATE NOCASE OR email = ? COLLATE NOCASE OR display_name = ? COLLATE NOCASE')
+      .get(username, username, displayName);
+    if (existing) throw new Error('هذا الاسم مسجل بالفعل. اختر اسمًا آخر.');
 
     const id = crypto.randomUUID();
     const salt = crypto.randomBytes(16).toString('hex');
     db.prepare(`INSERT INTO app_users(id,username,email,display_name,role,password_salt,password_hash,must_change_password)
-      VALUES(?,?,NULL,?,'operator',?,?,1)`)
+      VALUES(?,?,NULL,?,'operator',?,?,0)`)
       .run(id, username, displayName, salt, passwordHash(password, salt));
 
     const created = db.prepare('SELECT * FROM app_users WHERE id=?').get(id);
@@ -394,9 +391,9 @@ function registerAuthHandlers() {
     const target = db.prepare("SELECT id FROM app_users WHERE id=? AND role='operator'").get(userId);
     if (!target) throw new Error('المستخدم غير موجود.');
     const salt = crypto.randomBytes(16).toString('hex');
-    db.prepare('UPDATE app_users SET password_salt=?, password_hash=?, must_change_password=1 WHERE id=?')
+    db.prepare('UPDATE app_users SET password_salt=?, password_hash=?, must_change_password=0 WHERE id=?')
       .run(salt, passwordHash(password, salt), userId);
-    return { success: true, mustChangePassword: true };
+    return { success: true, mustChangePassword: false };
   });
 
   ipcMain.handle('auth:set-user-active', (_event, input = {}) => {
@@ -493,6 +490,7 @@ function registerAuthHandlers() {
       trailer: String(input.trailer || '—').trim().slice(0, 80) || '—',
       driver: String(input.driver || '—').trim().slice(0, 120) || '—',
       customer: String(input.customer || '—').trim().slice(0, 120) || '—',
+      customerType: ['customer', 'company'].includes(String(input.customerType || '')) ? String(input.customerType) : existing.customerType || 'customer',
       shipment: String(input.shipment || '—').trim().slice(0, 160) || '—',
       governorate: String(input.governorate || '—').trim().slice(0, 80) || '—',
       movementType: ['وارد', 'صادر'].includes(String(input.movementType || '')) ? String(input.movementType) : existing.movementType || 'وارد',
@@ -754,6 +752,8 @@ app.whenReady().then(() => {
 
   openDatabase();
   seedDefaultAccounts();
+  // Operator accounts use the password assigned by the supervisor immediately; no forced first-login reset.
+  db.prepare("UPDATE app_users SET must_change_password=0 WHERE role='operator' AND must_change_password<>0").run();
   registerAuthHandlers();
 
   // Avoid rebuilding the entire Excel workbook before the window appears.
