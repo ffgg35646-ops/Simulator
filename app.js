@@ -1535,27 +1535,58 @@
     const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, char => ({
       '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
     })[char]);
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) { showToast('اسمح بفتح النوافذ المنبثقة لإتمام الطباعة'); return; }
     const tableHead = columns.map(column => '<th>' + escapeHtml(column) + '</th>').join('');
     const tableRows = rows.map(row => '<tr>' + columns.map(column => '<td>' + escapeHtml(row[column]) + '</td>').join('') + '</tr>').join('');
-    printWindow.document.open();
-    printWindow.document.write(`<!doctype html>
-<html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>تقرير سجل الوزن</title>
-<style>
-@page { size: landscape; margin: 10mm; }
-body { font-family: Arial,Tahoma,sans-serif; color:#172744; padding:12px; }
-h2 { text-align:center; margin:0 0 8px; } p { text-align:center; margin:0 0 16px; color:#687487; font-size:12px; }
-table { width:100%; border-collapse:collapse; font-size:11px; }
-th,td { border:1px solid #9aa5b5; padding:8px 7px; text-align:center; }
-th { background:#edf0f5 !important; font-weight:bold; } tr { break-inside:avoid; }
-@media print { body { padding:0; } }
-</style></head><body>
-<h2>تقرير سجل الوزن</h2><p>تاريخ الطباعة: ${escapeHtml(new Date().toLocaleString('ar-EG'))}</p>
-<table><thead><tr>${tableHead}</tr></thead><tbody>${tableRows}</tbody></table>
-<script>window.addEventListener('load', () => { window.focus(); window.print(); });<\/script>
-</body></html>`);
-    printWindow.document.close();
+    const existingArea = document.getElementById('weightReportPrintArea');
+    const existingStyle = document.getElementById('weightReportPrintStyle');
+    existingArea?.remove();
+    existingStyle?.remove();
+
+    const printArea = document.createElement('section');
+    printArea.id = 'weightReportPrintArea';
+    printArea.innerHTML = `
+      <h2>تقرير سجل الوزن</h2>
+      <p>تاريخ الطباعة: ${escapeHtml(new Date().toLocaleString('ar-EG'))}</p>
+      <table><thead><tr>${tableHead}</tr></thead><tbody>${tableRows}</tbody></table>
+    `;
+    const printStyle = document.createElement('style');
+    printStyle.id = 'weightReportPrintStyle';
+    printStyle.textContent = `
+      #weightReportPrintArea { display:none; }
+      @media print {
+        body.printing-weight-report > *:not(#weightReportPrintArea) { display:none !important; }
+        body.printing-weight-report #weightReportPrintArea {
+          display:block !important; width:100% !important; padding:10mm !important;
+          margin:0 !important; background:#fff !important; color:#172744 !important;
+          direction:rtl !important; font-family:Arial,Tahoma,sans-serif !important;
+        }
+        #weightReportPrintArea h2 { text-align:center; margin:0 0 8px; font-size:20px; }
+        #weightReportPrintArea p { text-align:center; margin:0 0 16px; color:#687487; font-size:12px; }
+        #weightReportPrintArea table { width:100%; border-collapse:collapse; font-size:11px; white-space:nowrap; }
+        #weightReportPrintArea th,#weightReportPrintArea td { border:1px solid #9aa5b5; padding:8px 7px; text-align:center; }
+        #weightReportPrintArea th { background:#edf0f5 !important; font-weight:bold; }
+        #weightReportPrintArea tr { break-inside:avoid; }
+      }
+      @page { size:landscape; margin:10mm; }
+    `;
+    document.head.appendChild(printStyle);
+    document.body.appendChild(printArea);
+    document.body.classList.add('printing-weight-report');
+
+    const cleanup = () => {
+      document.body.classList.remove('printing-weight-report');
+      printArea.remove();
+      printStyle.remove();
+      window.removeEventListener('afterprint', cleanup);
+    };
+    window.addEventListener('afterprint', cleanup, { once: true });
+    try {
+      window.focus();
+      window.print();
+    } catch (error) {
+      cleanup();
+      showToast('تعذرت طباعة التقرير: ' + error.message);
+    }
   }
 
   async function exportExcel() {
