@@ -557,57 +557,29 @@ function getStoredRecords() {
 
 function makeExcelWorkbook(records) {
   const headers = [
-    'رقم التذكرة', 'نوع الحركة', 'رقم السيارة', 'رقم المقطورة', 'اسم السائق', 'اسم العميل', 'اسم الشحنة', 'المحافظة',
-    'قراءة الميزان الأصلية الأولى (كجم)', 'الوزن المعتمد الأول (كجم)', 'فرق تعديل الأولى (كجم)',
-    'قراءة الميزان الأصلية الثانية (كجم)', 'الوزن المعتمد الثاني (كجم)', 'فرق تعديل الثانية (كجم)',
-    'صافي الحمولة المعتمد (كجم)', 'مصدر الوزنة الأولى', 'مصدر الوزنة الثانية',
-    'وقت الوزنة الأولى', 'وقت الوزنة الثانية', 'تاريخ إنشاء التذكرة', 'المستخدم المسجل'
+    'السيارة', 'المقطورة', 'الوزنة الأولى', 'الوزنة الثانية',
+    'الصافي', 'التاريخ', 'صادر / وارد'
   ];
-  const detailHeaders = [
-    'رقم التذكرة', 'نوع الحركة', 'رقم السيارة', 'رقم المقطورة', 'اسم السائق', 'اسم العميل', 'اسم الشحنة', 'المحافظة',
-    'الوزنة', 'القراءة الأصلية (كجم)', 'الوزن المعتمد (كجم)', 'فرق التعديل (كجم)', 'مصدر الوزن', 'وقت التسجيل', 'المستخدم المسجل'
-  ];
-  const valueOf = (record, originalKey, approvedKey) => {
-    if (Object.prototype.hasOwnProperty.call(record, originalKey)) return record[originalKey];
-    return record[approvedKey] ?? null;
-  };
-  const original1 = r => valueOf(r, 'firstOriginalWeight', 'firstWeight');
-  const original2 = r => valueOf(r, 'secondOriginalWeight', 'secondWeight');
-  const adjustment = (original, approved) => original == null ? '—' : Number((Number(approved) - Number(original)).toFixed(2));
-  const ticketRows = records.slice().reverse().map(r => {
-    const firstRaw = original1(r);
-    const secondRaw = original2(r);
+  const rows = records.slice().reverse().map(record => {
+    const date = record.createdAt ? new Date(record.createdAt) : null;
+    const operationDate = date && !Number.isNaN(date.getTime())
+      ? date.toLocaleString('ar-EG')
+      : '—';
     return [
-      r.id || '', r.movementType || '—', r.plate || '', r.trailer || '—', r.driver || '', r.customer || '', r.shipment || '—', r.governorate || '—',
-      firstRaw == null ? 'إدخال يدوي' : firstRaw, r.firstWeight ?? '', adjustment(firstRaw, r.firstWeight),
-      secondRaw == null ? 'إدخال يدوي' : secondRaw, r.secondWeight ?? '', adjustment(secondRaw, r.secondWeight),
-      r.netWeight ?? '', r.firstSource || r.source || '', r.secondSource || r.source || '',
-      r.firstTime || '', r.secondTime || '', r.createdAt || '', r.createdByUserName || ''
+      record.plate || '—',
+      record.trailer || '—',
+      record.firstWeight ?? '',
+      record.secondWeight ?? '',
+      record.netWeight ?? '',
+      operationDate,
+      record.movementType || '—'
     ];
   });
-  const detailRows = [];
-  for (const r of records.slice().reverse()) {
-    for (const item of [
-      { label: 'الأولى', raw: original1(r), approved: r.firstWeight, source: r.firstSource || r.source, time: r.firstTime },
-      { label: 'الثانية', raw: original2(r), approved: r.secondWeight, source: r.secondSource || r.source, time: r.secondTime }
-    ]) {
-      detailRows.push([
-        r.id || '', r.movementType || '—', r.plate || '', r.trailer || '—', r.driver || '', r.customer || '', r.shipment || '—', r.governorate || '—',
-        item.label, item.raw == null ? 'إدخال يدوي' : item.raw,
-        item.approved ?? '', adjustment(item.raw, item.approved),
-        item.source || '', item.time || '', r.createdByUserName || ''
-      ]);
-    }
-  }
-  const tickets = XLSX.utils.aoa_to_sheet([headers, ...ticketRows]);
-  tickets['!cols'] = [22,14,18,18,20,24,22,18,25,22,20,25,22,20,23,24,24,24,24,24,22].map(wch => ({ wch }));
-  tickets['!autofilter'] = { ref: `A1:U${Math.max(1, ticketRows.length + 1)}` };
-  const details = XLSX.utils.aoa_to_sheet([detailHeaders, ...detailRows]);
-  details['!cols'] = [22,14,18,18,20,24,22,18,14,23,22,20,24,24,22].map(wch => ({ wch }));
-  details['!autofilter'] = { ref: `A1:O${Math.max(1, detailRows.length + 1)}` };
+  const sheet = XLSX.utils.aoa_to_sheet([headers, ...rows]);
+  sheet['!cols'] = [20, 20, 17, 17, 17, 25, 17].map(wch => ({ wch }));
+  sheet['!autofilter'] = { ref: `A1:G${Math.max(1, rows.length + 1)}` };
   const workbook = XLSX.utils.book_new();
-  XLSX.utils.book_append_sheet(workbook, tickets, 'سجل الوزن');
-  XLSX.utils.book_append_sheet(workbook, details, 'تفاصيل الوزنتين');
+  XLSX.utils.book_append_sheet(workbook, sheet, 'قاعدة البيانات');
   return workbook;
 }
 
