@@ -444,6 +444,35 @@
     </section>
   </div>
 
+  <div class="modal-backdrop" id="supervisorResetPasswordModal">
+    <section class="account-settings-card" role="dialog" aria-modal="true" aria-labelledby="supervisorResetPasswordTitle">
+      <div class="modal-heading">
+        <h3 id="supervisorResetPasswordTitle">تغيير كلمة مرور المستخدم</h3>
+        <button type="button" id="closeSupervisorResetPassword" aria-label="إغلاق">×</button>
+      </div>
+      <form id="supervisorResetPasswordForm" class="account-settings-form">
+        <p class="supervisor-user-note">تعيين كلمة مرور جديدة للحساب: <strong id="supervisorResetPasswordUser"></strong></p>
+        <label>كلمة المرور الجديدة
+          <div class="password-field">
+            <input id="supervisorResetPassword" type="password" minlength="3" maxlength="128" autocomplete="new-password" placeholder="اكتب كلمة المرور الجديدة" required />
+            <button class="password-visibility" type="button" data-toggle-password="supervisorResetPassword" aria-label="إظهار كلمة المرور" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg></button>
+          </div>
+        </label>
+        <label>تأكيد كلمة المرور الجديدة
+          <div class="password-field">
+            <input id="supervisorResetPasswordConfirm" type="password" minlength="3" maxlength="128" autocomplete="new-password" placeholder="أعد كتابة كلمة المرور" required />
+            <button class="password-visibility" type="button" data-toggle-password="supervisorResetPasswordConfirm" aria-label="إظهار تأكيد كلمة المرور" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg></button>
+          </div>
+        </label>
+        <p class="account-form-message" id="supervisorResetPasswordMessage" role="status"></p>
+        <div class="account-form-actions">
+          <button class="btn btn-primary" id="saveSupervisorResetPassword" type="submit">حفظ كلمة المرور</button>
+          <button class="btn btn-outline" id="cancelSupervisorResetPassword" type="button">إلغاء</button>
+        </div>
+      </form>
+    </section>
+  </div>
+
   <script src="./node_modules/xlsx/dist/xlsx.full.min.js" onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js'"></script>
   <script src="./app.js"></script>
 </body>
