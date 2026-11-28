@@ -132,6 +132,7 @@
       trailer: $('trailerInput').value.trim() || '—',
       driver: $('driverInput').value.trim() || '—',
       customer: $('customerInput').value.trim() || '—',
+      customerType: $('customerTypeInput').value || 'customer',
       shipment: $('shipmentInput').value.trim() || '—',
       governorate: $('governorateInput').value || '—',
       movementType: $('movementTypeInput').value || 'وارد'
@@ -212,6 +213,7 @@
     $('supervisorTrailer').value = record.trailer === '—' ? '' : (record.trailer || '');
     $('supervisorDriver').value = record.driver === '—' ? '' : (record.driver || '');
     $('supervisorCustomer').value = record.customer === '—' ? '' : (record.customer || '');
+    $('supervisorCustomerType').value = record.customerType === 'company' ? 'company' : 'customer';
     $('supervisorShipment').value = record.shipment === '—' ? '' : (record.shipment || '');
     $('supervisorGovernorate').value = record.governorate === '—' ? '' : (record.governorate || '');
     $('supervisorMovementType').value = record.movementType || 'وارد';
@@ -298,6 +300,7 @@
       trailer: $('supervisorTrailer').value.trim() || '—',
       driver: $('supervisorDriver').value.trim() || '—',
       customer: $('supervisorCustomer').value.trim() || '—',
+      customerType: $('supervisorCustomerType').value || 'customer',
       shipment: $('supervisorShipment').value.trim() || '—',
       governorate: $('supervisorGovernorate').value || '—',
       movementType: $('supervisorMovementType').value || 'وارد',
@@ -842,6 +845,32 @@
     $('reportAverage').textContent = fmt(filtered.length ? Math.round(total/filtered.length) : 0)+' كجم';
     const emptyColumns = activeUser?.role === 'supervisor' ? 14 : 13;
     $('reportRecordsTable').innerHTML = filtered.length ? filtered.map(r=>rowMarkup(r,true)).join('') : '<tr class="empty-row"><td colspan="'+emptyColumns+'">'+(reportSource.length ? 'لا توجد نتائج مطابقة للبحث' : 'لا توجد عمليات مسجلة')+'</td></tr>';
+    renderCustomerDirectory();
+  }
+  function renderCustomerDirectory() {
+    const query = ($('customerDirectorySearch')?.value || '').trim().toLocaleLowerCase('ar');
+    const type = $('customerDirectoryType')?.value || 'all';
+    const groups = new Map();
+    records.forEach(record => {
+      const name = String(record.customer || '').trim();
+      if (!name || name === '—') return;
+      const customerType = record.customerType === 'company' ? 'company' : 'customer';
+      if (type !== 'all' && customerType !== type) return;
+      const key = customerType + '|' + name.toLocaleLowerCase('ar');
+      const group = groups.get(key) || { name, customerType, count: 0, latest: record, searchText: '' };
+      group.count += 1;
+      if (new Date(record.createdAt || 0).getTime() >= new Date(group.latest.createdAt || 0).getTime()) group.latest = record;
+      group.searchText += ' ' + [record.customer, record.plate, record.trailer, record.driver, record.shipment, record.governorate, record.id, record.movementType].join(' ');
+      groups.set(key, group);
+    });
+    const results = [...groups.values()].filter(group =>
+      !query || (group.name + ' ' + group.searchText).toLocaleLowerCase('ar').includes(query)
+    ).sort((a,b) => a.name.localeCompare(b.name, 'ar'));
+    $('customerDirectoryCount').textContent = fmt(results.length) + ' جهة';
+    $('customerDirectoryTable').innerHTML = results.length ? results.map(group => {
+      const latest = group.latest;
+      return '<tr><td><strong>'+esc(group.name)+'</strong></td><td>'+ (group.customerType === 'company' ? 'شركة' : 'عميل') +'</td><td>'+fmt(group.count)+'</td><td>'+esc(latest.plate || '—')+'</td><td>'+esc(latest.driver || '—')+'</td><td>'+esc(latest.shipment || '—')+'</td><td>'+fmt(latest.netWeight)+' كجم</td><td>'+stamp(new Date(latest.createdAt))+'</td></tr>';
+    }).join('') : '<tr class="empty-row"><td colspan="8">'+(records.some(record => record.customer && record.customer !== '—') ? 'لا توجد نتائج مطابقة للبحث' : 'لا توجد بيانات عملاء أو شركات مسجلة بعد')+'</td></tr>';
   }
   function switchView(name) {
     // Operator accounts are intentionally limited to the single operating screen.
@@ -1601,6 +1630,8 @@ th { background:#e9edf0 !important; font-weight:bold; } tr { break-inside:avoid;
     if (event.target === $('supervisorAddModal')) closeSupervisorAddModal();
   });
   $('recordSearch').addEventListener('input',renderRecords);
+  $('customerDirectorySearch').addEventListener('input',renderCustomerDirectory);
+  $('customerDirectoryType').addEventListener('change',renderCustomerDirectory);
   $('clearRecordSearch').addEventListener('click',()=>{ $('recordSearch').value=''; renderRecords(); });
   $('exportRecords').addEventListener('click',exportCSV);
   $('exportExcel').addEventListener('click',exportExcel);
