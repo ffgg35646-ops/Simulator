@@ -401,6 +401,14 @@
     $('ticketContent').innerHTML = ticketMarkup(record);
     $('ticketModal').classList.add('open');
   }
+
+  function printRecordTicket(recordId) {
+    const record = records.find(item => String(item.id) === String(recordId));
+    if (!record) { showToast('لم يتم العثور على العملية المطلوبة للطباعة'); return; }
+    openTicket(record);
+    window.addEventListener('afterprint', () => $('ticketModal').classList.remove('open'), { once: true });
+    window.setTimeout(printTicketOnly, 80);
+  }
   function ticketMarkup(r) {
     return '<div class="ticket-paper"><div class="ticket-location">مدينة السادات<br>المدفن الصحي</div>' +
       '<div class="ticket-top-grid">' +
@@ -841,56 +849,90 @@
     $('reportCount').textContent = fmt(filtered.length);
     $('reportNet').textContent = fmt(total)+' كجم';
     $('reportAverage').textContent = fmt(filtered.length ? Math.round(total/filtered.length) : 0)+' كجم';
-    $('reportRecordsTable').innerHTML = filtered.length ? filtered.map(r=>reportRowMarkup(r)).join('') : '<tr class="empty-row"><td colspan="7">'+(reportSource.length ? 'لا توجد نتائج مطابقة للبحث' : 'لا توجد عمليات مسجلة')+'</td></tr>';
+    $('reportRecordsTable').innerHTML = filtered.length ? filtered.map(r=>reportRowMarkup(r)).join('') : '<tr class="empty-row"><td colspan="9">'+(reportSource.length ? 'لا توجد نتائج مطابقة للبحث' : 'لا توجد عمليات مسجلة')+'</td></tr>';
     renderCustomerDirectory();
   }
   function reportRowMarkup(r) {
     const operationDate = r.createdAt ? stamp(new Date(r.createdAt)) : '—';
-    return '<tr><td>'+esc(r.plate || '—')+'</td>' +
-      '<td>'+esc(r.trailer || '—')+'</td>' +
-      '<td>'+fmt(r.firstWeight)+'</td>' +
-      '<td>'+fmt(r.secondWeight)+'</td>' +
-      '<td><strong class="net-cell">'+fmt(r.netWeight)+' كجم</strong></td>' +
-      '<td class="report-date-cell">'+esc(operationDate)+'</td>' +
-      '<td>'+esc(r.movementType || '—')+'</td></tr>';
+    const operatorName = r.createdByUserName || r.createdByUsername || '—';
+    return '<tr>' +
+      '<td class="record-user-cell">' + esc(operatorName) + '</td>' +
+      '<td>' + esc(r.plate || '—') + '</td>' +
+      '<td>' + esc(r.trailer || '—') + '</td>' +
+      '<td>' + fmt(r.firstWeight) + '</td>' +
+      '<td>' + fmt(r.secondWeight) + '</td>' +
+      '<td><strong class="net-cell">' + fmt(r.netWeight) + ' كجم</strong></td>' +
+      '<td class="report-date-cell">' + esc(operationDate) + '</td>' +
+      '<td>' + esc(r.movementType || '—') + '</td>' +
+      '<td><div class="report-database-actions">' +
+        '<button class="table-action" data-export-ticket="' + esc(r.id) + '">تصدير Excel</button>' +
+        '<button class="table-action" data-print-record="' + esc(r.id) + '">طباعة</button>' +
+        '<button class="table-action" data-edit-record="' + esc(r.id) + '">تعديل</button>' +
+      '</div></td>' +
+      '</tr>';
   }
 
   function renderCustomerDirectory() {
-    const renderDirectoryType = (type, searchId, countId, tableId, label) => {
-      const query = ($(searchId)?.value || '').trim().toLocaleLowerCase('ar');
-      const groups = new Map();
-      records.forEach(record => {
-        const name = String(record.customer || '').trim();
-        if (!name || name === '—') return;
-        const customerType = record.customerType === 'company' ? 'company' : 'customer';
-        if (customerType !== type) return;
-        const key = customerType + '|' + name.toLocaleLowerCase('ar');
-        const group = groups.get(key) || { name, count: 0, latest: record, searchText: '' };
-        group.count += 1;
-        if (new Date(record.createdAt || 0).getTime() >= new Date(group.latest.createdAt || 0).getTime()) group.latest = record;
-        group.searchText += ' ' + [record.customer, record.plate, record.trailer, record.driver, record.shipment, record.governorate, record.id, record.movementType].join(' ');
-        groups.set(key, group);
-      });
-      const results = [...groups.values()].filter(group =>
-        !query || (group.name + ' ' + group.searchText).toLocaleLowerCase('ar').includes(query)
-      ).sort((a,b) => a.name.localeCompare(b.name, 'ar'));
-      const count = $(countId);
-      const table = $(tableId);
-      if (count) count.textContent = fmt(results.length) + ' ' + label;
-      if (table) table.innerHTML = results.length ? results.map(group => {
-        const latest = group.latest;
-        return '<tr><td><strong>'+esc(group.name)+'</strong></td><td>'+fmt(group.count)+'</td><td>'+esc(latest.plate || '—')+'</td><td>'+esc(latest.driver || '—')+'</td><td>'+esc(latest.shipment || '—')+'</td><td>'+fmt(latest.netWeight)+' كجم</td><td>'+stamp(new Date(latest.createdAt))+'</td></tr>';
-      }).join('') : '<tr class="empty-row"><td colspan="7">'+(records.some(record => record.customer && record.customer !== '—' && (type === 'company' ? record.customerType === 'company' : record.customerType !== 'company')) ? 'لا توجد نتائج مطابقة للبحث' : 'لا توجد بيانات '+(type === 'company' ? 'شركات' : 'عملاء')+' مسجلة بعد')+'</td></tr>';
-    };
-    renderDirectoryType('customer', 'customersDirectorySearch', 'customersDirectoryCount', 'customersDirectoryTable', 'عميل');
-    renderDirectoryType('company', 'companiesDirectorySearch', 'companiesDirectoryCount', 'companiesDirectoryTable', 'شركة');
+    const query = ($('customersDirectorySearch')?.value || '').trim().toLocaleLowerCase('ar');
+    const entityFilter = $('directoryTypeFilter')?.value || 'all';
+    const movementFilter = $('directoryMovementFilter')?.value || 'all';
+    const groups = new Map();
+
+    records.forEach(record => {
+      const name = String(record.customer || '').trim();
+      if (!name || name === '—') return;
+
+      const customerType = record.customerType === 'company' ? 'company' : 'customer';
+      if (entityFilter !== 'all' && customerType !== entityFilter) return;
+      if (movementFilter !== 'all' && String(record.movementType || '') !== movementFilter) return;
+      if (query && !name.toLocaleLowerCase('ar').includes(query)) return;
+
+      const key = customerType + '|' + name.toLocaleLowerCase('ar');
+      const group = groups.get(key) || { name, type: customerType, count: 0, latest: record };
+      group.count += 1;
+      if (new Date(record.createdAt || 0).getTime() >= new Date(group.latest.createdAt || 0).getTime()) {
+        group.latest = record;
+      }
+      groups.set(key, group);
+    });
+
+    const results = [...groups.values()].sort((a, b) => a.name.localeCompare(b.name, 'ar'));
+    const count = $('customersDirectoryCount');
+    const table = $('customersDirectoryTable');
+    if (count) count.textContent = fmt(results.length) + ' جهة';
+
+    if (!table) return;
+    if (!results.length) {
+      const hasDirectoryData = records.some(record => record.customer && record.customer !== '—');
+      table.innerHTML = '<tr class="empty-row"><td colspan="9">' +
+        (hasDirectoryData ? 'لا توجد نتائج مطابقة للبحث أو الفلاتر' : 'لا توجد بيانات عملاء أو شركات مسجلة بعد') +
+        '</td></tr>';
+      return;
+    }
+
+    table.innerHTML = results.map(group => {
+      const latest = group.latest;
+      const typeLabel = group.type === 'company' ? 'شركة' : 'عميل';
+      return '<tr>' +
+        '<td><strong>' + esc(group.name) + '</strong></td>' +
+        '<td><span class="directory-entity-type ' + group.type + '">' + typeLabel + '</span></td>' +
+        '<td>' + fmt(group.count) + '</td>' +
+        '<td>' + esc(latest.movementType || '—') + '</td>' +
+        '<td>' + esc(latest.plate || '—') + '</td>' +
+        '<td>' + esc(latest.driver || '—') + '</td>' +
+        '<td>' + esc(latest.shipment || '—') + '</td>' +
+        '<td>' + fmt(latest.netWeight) + ' كجم</td>' +
+        '<td>' + stamp(new Date(latest.createdAt)) + '</td>' +
+        '</tr>';
+    }).join('');
   }
+
   function switchView(name) {
     // Operator accounts are intentionally limited to the single operating screen.
     if (activeUser?.role === 'operator' && name !== 'dashboard') name = 'dashboard';
     document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active',v.id==='view-'+name));
     document.querySelectorAll('.nav-link').forEach(v=>v.classList.toggle('active',v.dataset.view===name));
-    const titles={dashboard:'لوحة التشغيل',weighings:'سجل عمليات الوزن',vehicles:'السيارات والعملاء',reports:'التقارير والإحصائيات','user-management':'إدارة المستخدمين',customers:'العملاء',companies:'الشركات',devices:'الأجهزة والاتصال'};
+    const titles={dashboard:'لوحة التشغيل',weighings:'سجل عمليات الوزن',vehicles:'السيارات والعملاء',reports:'التقارير والإحصائيات','user-management':'إدارة المستخدمين',customers:'العملاء والشركات',devices:'الأجهزة والاتصال'};
     $('pageTitle').textContent=titles[name]||'لوحة التشغيل';
     $('sidebar').classList.remove('open');
     if(name==='weighings')renderRecords();
@@ -1530,7 +1572,7 @@
   function printExcelReport() {
     const exportRecords = getReportExportRecords();
     if (!exportRecords.length) { showToast('لا توجد عمليات لطباعتها'); return; }
-    const rows = exportRecords.slice().reverse().map(excelRowForRecord);
+    const rows = exportRecords.map(excelRowForRecord);
     const columns = Object.keys(rows[0] || {});
     const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, char => ({
       '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
@@ -1547,7 +1589,7 @@
     printArea.innerHTML = `
       <h2>تقرير سجل الوزن</h2>
       <p>تاريخ الطباعة: ${escapeHtml(new Date().toLocaleString('ar-EG'))}</p>
-      <table><thead><tr>${tableHead}</tr></thead><tbody>${tableRows}</tbody></table>
+      <table dir="rtl"><thead><tr>${tableHead}</tr></thead><tbody>${tableRows}</tbody></table>
     `;
     const printStyle = document.createElement('style');
     printStyle.id = 'weightReportPrintStyle';
@@ -1562,12 +1604,12 @@
         }
         #weightReportPrintArea h2 { text-align:center; margin:0 0 8px; font-size:20px; }
         #weightReportPrintArea p { text-align:center; margin:0 0 16px; color:#687487; font-size:12px; }
-        #weightReportPrintArea table { width:100%; border-collapse:collapse; font-size:11px; white-space:nowrap; }
-        #weightReportPrintArea th,#weightReportPrintArea td { border:1px solid #9aa5b5; padding:8px 7px; text-align:center; }
+        #weightReportPrintArea table { direction:rtl !important; width:100% !important; max-width:100% !important; table-layout:fixed !important; border-collapse:collapse; font-size:11px; white-space:nowrap; }
+        #weightReportPrintArea th,#weightReportPrintArea td { direction:rtl; unicode-bidi:plaintext; border:1px solid #9aa5b5; padding:8px 7px; text-align:center; }
         #weightReportPrintArea th { background:#edf0f5 !important; font-weight:bold; }
         #weightReportPrintArea tr { break-inside:avoid; }
       }
-      @page { size:landscape; margin:10mm; }
+      @page { size:A4 landscape; margin:10mm; }
     `;
     document.head.appendChild(printStyle);
     document.body.appendChild(printArea);
@@ -1667,8 +1709,9 @@
     if (event.target === $('supervisorAddModal')) closeSupervisorAddModal();
   });
   $('recordSearch').addEventListener('input',renderRecords);
-  $('customersDirectorySearch').addEventListener('input',renderCustomerDirectory);
-  $('companiesDirectorySearch').addEventListener('input',renderCustomerDirectory);
+  $('customersDirectorySearch').addEventListener('input', renderCustomerDirectory);
+  $('directoryTypeFilter').addEventListener('change', renderCustomerDirectory);
+  $('directoryMovementFilter').addEventListener('change', renderCustomerDirectory);
   $('clearRecordSearch').addEventListener('click',()=>{ $('recordSearch').value=''; renderRecords(); });
   $('exportRecords').addEventListener('click',exportCSV);
   $('exportExcel').addEventListener('click',exportExcel);
@@ -1925,6 +1968,8 @@
   document.addEventListener('click',e=>{
     const editButton = e.target.closest('[data-edit-record]');
     if (editButton) { openSupervisorEditModal(editButton.dataset.editRecord); return; }
+    const printRecordButton = e.target.closest('[data-print-record]');
+    if (printRecordButton) { printRecordTicket(printRecordButton.dataset.printRecord); return; }
     const deleteButton = e.target.closest('[data-delete-record]');
     if (deleteButton) { deleteRecord(deleteButton.dataset.deleteRecord); return; }
     if (e.target.closest('[data-delete-all-records]')) { deleteAllRecords(); return; }
@@ -2027,7 +2072,7 @@
       users.forEach(user => {
         const option = document.createElement('option');
         option.value = user.id;
-        option.textContent = user.displayName + ' (' + user.username + ')';
+        option.textContent = user.displayName;
         select.appendChild(option);
       });
       renderReports();
@@ -2041,7 +2086,7 @@
     const body = $('supervisorUsersTable');
     if (!body) return;
     if (!users.length) {
-      body.innerHTML = '<tr class="empty-row"><td colspan="5">لا يوجد مستخدمون حتى الآن</td></tr>';
+      body.innerHTML = '<tr class="empty-row"><td colspan="3">لا يوجد مستخدمون حتى الآن</td></tr>';
       return;
     }
     body.innerHTML = users.map(user => {
@@ -2049,7 +2094,7 @@
       const activeAction = user.isActive
         ? '<button class="table-action" data-user-toggle="'+esc(user.id)+'" data-active="0">إيقاف</button>'
         : '<button class="table-action" data-user-toggle="'+esc(user.id)+'" data-active="1">تفعيل</button>';
-      return '<tr><td>'+esc(user.displayName)+'</td><td>'+esc(user.username)+'</td><td>'+status+'</td><td>'+(user.mustChangePassword ? 'مطالب بالتغيير' : '—')+'</td><td><div class="table-actions"><button class="table-action" data-user-password="'+esc(user.id)+'" data-user-name="'+esc(user.displayName)+'">تغيير كلمة المرور</button>'+activeAction+'<button class="table-action delete-row-action" data-user-delete="'+esc(user.id)+'" data-user-name="'+esc(user.displayName)+'">حذف</button></div></td></tr>';
+      return '<tr><td><strong>'+esc(user.displayName)+'</strong></td><td>'+status+'</td><td><div class="table-actions"><button class="table-action" data-user-password="'+esc(user.id)+'" data-user-name="'+esc(user.displayName)+'">تغيير كلمة المرور</button>'+activeAction+'<button class="table-action delete-row-action" data-user-delete="'+esc(user.id)+'" data-user-name="'+esc(user.displayName)+'">حذف</button></div></td></tr>';
     }).join('');
   }
 
@@ -2198,9 +2243,7 @@
     if (activeUser?.role !== 'supervisor') return;
 
     const displayName = $('supervisorUserDisplayName').value.trim();
-    const username = $('supervisorUserUsername').value.trim();
     const password = $('supervisorUserPassword').value;
-    const confirmation = $('supervisorUserPasswordConfirm').value;
     const message = $('supervisorUserMessage');
     message.classList.remove('is-error');
 
@@ -2210,30 +2253,17 @@
       $('supervisorUserDisplayName').focus();
       return;
     }
-    if (username.length < 3 || username.length > 64) {
-      message.textContent = 'اسم المستخدم يجب أن يكون من 3 إلى 64 حرفًا.';
-      message.classList.add('is-error');
-      $('supervisorUserUsername').focus();
-      return;
-    }
     if (password.length < 3 || password.length > 128) {
       message.textContent = 'كلمة المرور يجب أن تكون من 3 إلى 128 حرفًا.';
       message.classList.add('is-error');
       $('supervisorUserPassword').focus();
       return;
     }
-    if (password !== confirmation) {
-      message.textContent = 'تأكيد كلمة المرور غير مطابق.';
-      message.classList.add('is-error');
-      $('supervisorUserPasswordConfirm').focus();
-      return;
-    }
-
     const submit = $('saveSupervisorUser');
     submit.disabled = true;
     message.textContent = 'جارٍ إنشاء حساب المستخدم...';
     try {
-      const createdUser = await window.desktopBridge.addUser({ displayName, username, password });
+      const createdUser = await window.desktopBridge.addUser({ displayName, password });
       closeSupervisorUserModal();
       await populateSupervisorUsers();
       showToast('تم إنشاء حساب ' + createdUser.displayName + ' بنجاح');
@@ -2249,7 +2279,7 @@
     const isSupervisor = activeUser?.role === 'supervisor';
     const isOperator = activeUser?.role === 'operator';
     document.documentElement.classList.toggle('operator-dashboard-only', isOperator);
-    const supervisorViews = ['reports', 'user-management', 'customers', 'companies'];
+    const supervisorViews = ['reports', 'user-management', 'customers'];
     document.querySelectorAll('.nav-link').forEach(button => {
       button.hidden = isSupervisor
         ? !supervisorViews.includes(button.dataset.view)
