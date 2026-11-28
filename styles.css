@@ -587,3 +587,122 @@ html.operator-dashboard-only .operator-logout-button[hidden]{
 .user-state{display:inline-flex;align-items:center;padding:4px 9px;border-radius:20px;font-size:10px;font-weight:700}
 .user-state.is-active{color:#73dfb0;background:#173b32}
 .user-state.is-disabled{color:#ffb1a9;background:#492a2b}
+
+
+/* Visual refresh: navy, gold and white. Existing structure and controls remain unchanged. */
+:root{
+  --bg:#f2f4f7;--surface:#ffffff;--surface2:#f7f8fa;--line:#dce1e8;
+  --muted:#687487;--text:#18263d;--teal:#c99b3b;--teal2:#a97b20;
+  --blue:#31527f;--amber:#c99b3b;--purple:#74628f;--danger:#c94b50;
+  --radius:14px;
+}
+body{background:var(--bg);color:var(--text)}
+.sidebar{background:#10213f;border-left:1px solid #24395b;box-shadow:-8px 0 28px #10213f12}
+.brand-mark{background:linear-gradient(145deg,#e0bd68,#b4872f);color:#10213f;box-shadow:0 8px 24px #d4ad552e}
+.brand strong{color:#fff}.brand small{color:#bdc8d9}
+.sidebar-label{color:#9cabc0}
+.nav-link{color:#c4cede}
+.nav-link:hover{background:#1b3155;color:#fff}
+.nav-link.active{background:#243b60;color:#f0cf7a;box-shadow:inset -3px 0 #d8b45b}
+.sidebar-foot{color:#9cabc0}
+.opensource-card{background:#1b3152;border-color:#34496a}
+.opensource-card small{color:#bdc8d9}
+.pulse-dot{background:#d8b45b;box-shadow:0 0 0 4px #d8b45b24}
+.main-area{color:var(--text)}
+.topbar{border-bottom-color:#dce1e8}
+.eyebrow{color:#9a762d}
+.topbar h1,.welcome-row h2,.section-intro h2,.panel-heading h3{color:#172744}
+.topbar-actions .system-status{color:#657287}
+.avatar{background:#e8dfca;color:#74551c}
+.welcome-row p,.section-intro p{color:#687487}
+.date-chip{background:#fff;border-color:#dce1e8;color:#536176}
+.stat-card,.panel{background:#fff;border-color:#dce1e8;box-shadow:0 5px 18px #1b2b4610}
+.stat-card span,.capture-title small,.manual-entry-head small,.form-grid label{color:#687487}
+.stat-card strong{color:#172744}
+.stat-card small{color:#8791a0}
+.stat-icon.teal{background:#f4ecd9;color:#a77a25}
+.stat-icon.blue{background:#e8eef7;color:#31527f}
+.stat-icon.amber{background:#f6efdf;color:#a77a25}
+.stat-icon.purple{background:#eeeaf5;color:#74628f}
+.connection-stat-content>span{color:#687487}
+.connection-state{color:#172744!important}
+.weight-display{background:linear-gradient(135deg,#10213f,#1d365c);border:1px solid #29446d}
+.weight-caption,.weight-meta{color:#d0d8e4}
+.weight-value{color:#f0cf7a}
+.weight-value span{color:#e4d4ad}
+.stable-indicator{color:#e8cd88}
+.capacity-track{background:#405372}
+.capacity-track div{background:linear-gradient(90deg,#b4872f,#f0cf7a)!important}
+.capacity-labels{color:#d0d8e4}
+.manual-entry{background:#f8f9fb;border:1px solid #dce1e8}
+.manual-entry-head small{color:#687487}
+.manual-tag,.step-pill{background:#f1eadb;color:#8a6726}
+.btn-primary{background:linear-gradient(135deg,#dfbd68,#bd8e35);color:#172744;box-shadow:0 5px 14px #b4872f24}
+.btn-primary:hover:not(:disabled){filter:brightness(1.04)}
+.btn-quiet{background:#edf0f4;color:#43516a;border-color:#d5dce5}
+.btn-quiet:hover{border-color:#c39a49;color:#172744}
+.btn-outline{background:#fff;border-color:#cbd3de;color:#34445e}
+.btn-outline:hover{border-color:#bd913b;color:#8b6724;background:#fcfaf5}
+.form-grid input,.form-grid select,.search-input,.settings-row input,
+.manual-weight-row input,.weight-mode-label select,.serial-controls select,
+.customer-directory-toolbar select{
+  background:#fff;border-color:#cbd3de;color:#172744;
+}
+.form-grid input::placeholder,.manual-weight-row input::placeholder,.search-input::placeholder{color:#9aa3b1}
+.form-grid input:focus,.form-grid select:focus,.search-input:focus,.settings-row input:focus,
+.manual-weight-row input:focus,.weight-mode-label select:focus,.customer-directory-toolbar select:focus{
+  border-color:#c49a45;box-shadow:0 0 0 3px #c49a451c;
+}
+.capture-box{background:#f5f6f8;border-color:#dce1e8}
+.capture-box span,.capture-box small{color:#718096}
+.capture-box strong{color:#172744}
+.capture-box.net-box{background:#f5efdf;border-color:#dfc98f}
+.capture-box.net-box strong{color:#8b6724}
+.capture-arrow{color:#8791a0}
+.inline-message{color:#9a762d}
+.table-wrap{border:1px solid #e1e5eb;border-radius:10px}
+th{background:#edf0f5;color:#4d5b72}
+td{color:#34445e;border-bottom-color:#e7eaf0}
+tbody tr:hover td{background:#fbfaf6}
+.empty-row td{color:#8993a2}
+.text-button{color:#9a762d}
+.toolbar .record-count{color:#687487}
+.chart-bar{background:linear-gradient(180deg,#e0bd68,#a97b20)}
+.chart-bar span,.chart-column small{color:#687487}
+.protocol-icon{background:#f1eadb;color:#9a762d}
+.protocol-state{color:#8b6724}
+.warning-pill{background:#f6efdf;color:#8b6724}
+.note-panel{border-color:#e1d3ad;background:#fbf8ef}
+.note-panel strong{color:#76591f}.note-panel p{color:#6d6249}
+.settings-row{border-bottom-color:#e3e7ed}
+.settings-row small{color:#7a8697}
+.setting-value{color:#34445e}
+.setting-value span,.storage-badge{color:#8b6724}
+.storage-badge{background:#f3ecd9}
+.app-footer{color:#8993a2}
+.toast{background:#172d4d;border-color:#334c70;color:#fff}
+.modal-backdrop{background:#10213f99}
+.table-action{border-color:#d4dbe5;background:#f4f6f8;color:#40506a}
+.table-action:hover{border-color:#c49a45;color:#8b6724}
+.table-action.delete-row-action{border-color:#e6c9ca;background:#fbf0f0;color:#b4474d}
+.table-action.delete-row-action:hover{border-color:#c96c71;background:#f9e6e7}
+.user-state.is-active{color:#28764f;background:#e6f3eb}
+.user-state.is-disabled{color:#a83e45;background:#f8e9ea}
+.customer-directory-panel td strong{color:#172744}
+.password-visibility{color:#718096}
+.password-visibility:hover{background:#f0eadc;color:#8b6724}
+.password-visibility:focus-visible{outline-color:#c49a45}
+.supervisor-user-note{color:#687487}
+.account-settings-card,.supervisor-add-modal{background:#fff;color:#172744}
+.account-settings-form label,.supervisor-add-form label{color:#536176}
+.account-settings-form input,.supervisor-add-form input,.supervisor-add-form select{
+  background:#fff;border-color:#cbd3de;color:#172744;
+}
+.account-form-message{color:#9a762d}
+.system-settings-details summary{color:#34445e}
+.excel-sync-status{color:#8b6724}
+@media(max-width:850px){.sidebar{box-shadow:-10px 0 35px #10213f33}}
+@media print{
+  body{background:#fff;color:#111}
+  .panel,.stat-card{box-shadow:none}
+}
