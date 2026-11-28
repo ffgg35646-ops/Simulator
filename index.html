@@ -57,6 +57,9 @@
         <button class="nav-link" data-view="weighings"><span class="nav-icon">▤</span> سجل الوزن</button>
         <button class="nav-link" data-view="vehicles"><span class="nav-icon">▰</span> السيارات والعملاء</button>
         <button class="nav-link" data-view="reports"><span class="nav-icon">▥</span> التقارير</button>
+        <button class="nav-link" data-view="user-management"><span class="nav-icon">♙</span> إدارة المستخدمين</button>
+        <button class="nav-link" data-view="customers"><span class="nav-icon">♧</span> العملاء</button>
+        <button class="nav-link" data-view="companies"><span class="nav-icon">▣</span> الشركات</button>
         <button class="nav-link" data-view="devices">الأجهزة والاتصال</button>
       </nav>
       <div class="sidebar-bottom">
@@ -141,21 +144,32 @@
             <select id="supervisorReportFilter"><option value="all">كل المستخدمين</option></select>
           </label>
         </div>
-        <div class="panel supervisor-users-panel">
-          <div class="panel-heading"><div><h3>إدارة المستخدمين</h3><small>إضافة الحسابات وتغيير كلمات المرور وإيقافها أو حذفها</small></div><span class="record-count">حسابات التشغيل</span></div>
+<div class="stats-grid"><article class="stat-card"><div class="stat-icon teal">▤</div><div><span>إجمالي العمليات</span><strong id="reportCount">0</strong></div></article><article class="stat-card"><div class="stat-icon blue">▰</div><div><span>إجمالي صافي الوزن</span><strong id="reportNet">0 كجم</strong></div></article><article class="stat-card"><div class="stat-icon amber">◉</div><div><span>متوسط الحمولة</span><strong id="reportAverage">0 كجم</strong></div></article></div><div class="panel"><div class="panel-heading report-records-heading"><div><h3>قاعدة البيانات</h3><small></small></div><button class="btn btn-danger-ghost" type="button" data-delete-all-records>حذف جميع السجلات</button></div><div class="table-wrap"><table><thead><tr><th>رقم السيارة</th><th>رقم المقطورة</th><th>تاريخ العملية</th><th>صافي الوزن</th><th>الوزن الأول</th><th>الوزن الثاني</th><th>المحافظة</th><th id="reportUserHeader" hidden>المستخدم</th><th>نوع الحركة</th><th>السائق</th><th>العميل</th><th>اسم الشحنة</th><th>إجراء</th></tr></thead><tbody id="reportRecordsTable"><tr class="empty-row"><td colspan="13">لا توجد عمليات مسجلة</td></tr></tbody></table></div></div>
+</section>
+
+      <section class="view" id="view-user-management">
+        <div class="section-intro"><div><h2>إدارة المستخدمين</h2><p>إضافة حسابات التشغيل وتغيير كلمات المرور وتفعيل الحسابات أو إيقافها.</p></div><div class="record-actions"><button class="btn btn-primary" type="button" id="supervisorAddUser">إضافة مستخدم</button></div></div>
+        <div class="panel supervisor-users-panel"><div class="panel-heading"><div><h3>حسابات التشغيل</h3><small>إدارة صلاحيات دخول المستخدمين</small></div><span class="record-count">المستخدمون</span></div>
           <div class="table-wrap"><table><thead><tr><th>الاسم</th><th>اسم الدخول</th><th>الحالة</th><th>كلمة المرور</th><th>الإجراءات</th></tr></thead><tbody id="supervisorUsersTable"><tr class="empty-row"><td colspan="5">جارٍ تحميل المستخدمين...</td></tr></tbody></table></div>
         </div>
-<div class="stats-grid"><article class="stat-card"><div class="stat-icon teal">▤</div><div><span>إجمالي العمليات</span><strong id="reportCount">0</strong></div></article><article class="stat-card"><div class="stat-icon blue">▰</div><div><span>إجمالي صافي الوزن</span><strong id="reportNet">0 كجم</strong></div></article><article class="stat-card"><div class="stat-icon amber">◉</div><div><span>متوسط الحمولة</span><strong id="reportAverage">0 كجم</strong></div></article></div><div class="panel"><div class="panel-heading report-records-heading"><div><h3>قاعدة البيانات</h3><small></small></div><button class="btn btn-danger-ghost" type="button" data-delete-all-records>حذف جميع السجلات</button></div><div class="table-wrap"><table><thead><tr><th>رقم السيارة</th><th>رقم المقطورة</th><th>تاريخ العملية</th><th>صافي الوزن</th><th>الوزن الأول</th><th>الوزن الثاني</th><th>المحافظة</th><th id="reportUserHeader" hidden>المستخدم</th><th>نوع الحركة</th><th>السائق</th><th>العميل</th><th>اسم الشحنة</th><th>إجراء</th></tr></thead><tbody id="reportRecordsTable"><tr class="empty-row"><td colspan="13">لا توجد عمليات مسجلة</td></tr></tbody></table></div></div>
-          <div class="panel customer-directory-panel">
-            <div class="panel-heading"><div><h3>العملاء والشركات</h3><small>كل العملاء والشركات المسجلين في عمليات الوزن</small></div><span class="record-count" id="customerDirectoryCount">0 جهة</span></div>
-            <div class="customer-directory-toolbar">
-              <input id="customerDirectorySearch" class="search-input" type="search" placeholder="بحث فوري بالاسم أو السيارة أو السائق أو الشحنة أو رقم التذكرة..." />
-              <select id="customerDirectoryType" aria-label="نوع البحث"><option value="all">بحث شامل: العملاء والشركات</option><option value="customer">العملاء فقط</option><option value="company">الشركات فقط</option></select>
-            </div>
-            <div class="table-wrap"><table><thead><tr><th>الاسم</th><th>التصنيف</th><th>عدد العمليات</th><th>آخر سيارة</th><th>آخر سائق</th><th>آخر شحنة</th><th>آخر صافي وزن</th><th>آخر تسجيل</th></tr></thead><tbody id="customerDirectoryTable"><tr class="empty-row"><td colspan="8">لا توجد بيانات مسجلة</td></tr></tbody></table></div>
-          </div></section>
+      </section>
 
-      
+      <section class="view" id="view-customers">
+        <div class="section-intro"><div><h2>العملاء</h2><p>قائمة العملاء المسجلين في عمليات الوزن.</p></div></div>
+        <div class="panel customer-directory-panel"><div class="panel-heading"><div><h3>سجل العملاء</h3><small>البيانات مستخرجة من عمليات الوزن المسجلة</small></div><span class="record-count" id="customersDirectoryCount">0 عميل</span></div>
+          <div class="customer-directory-toolbar"><input id="customersDirectorySearch" class="search-input" type="search" placeholder="ابحث باسم العميل أو السيارة أو السائق أو الشحنة أو رقم التذكرة..." /></div>
+          <div class="table-wrap"><table><thead><tr><th>اسم العميل</th><th>عدد العمليات</th><th>آخر سيارة</th><th>آخر سائق</th><th>آخر شحنة</th><th>آخر صافي وزن</th><th>آخر تسجيل</th></tr></thead><tbody id="customersDirectoryTable"><tr class="empty-row"><td colspan="7">لا توجد بيانات عملاء</td></tr></tbody></table></div>
+        </div>
+      </section>
+
+      <section class="view" id="view-companies">
+        <div class="section-intro"><div><h2>الشركات</h2><p>قائمة الشركات المسجلة في عمليات الوزن.</p></div></div>
+        <div class="panel customer-directory-panel"><div class="panel-heading"><div><h3>سجل الشركات</h3><small>البيانات مستخرجة من عمليات الوزن المسجلة</small></div><span class="record-count" id="companiesDirectoryCount">0 شركة</span></div>
+          <div class="customer-directory-toolbar"><input id="companiesDirectorySearch" class="search-input" type="search" placeholder="ابحث باسم الشركة أو السيارة أو السائق أو الشحنة أو رقم التذكرة..." /></div>
+          <div class="table-wrap"><table><thead><tr><th>اسم الشركة</th><th>عدد العمليات</th><th>آخر سيارة</th><th>آخر سائق</th><th>آخر شحنة</th><th>آخر صافي وزن</th><th>آخر تسجيل</th></tr></thead><tbody id="companiesDirectoryTable"><tr class="empty-row"><td colspan="7">لا توجد بيانات شركات</td></tr></tbody></table></div>
+        </div>
+      </section>
+
       <section class="view" id="view-devices">
         <div class="section-intro device-center-intro">
           <div>
