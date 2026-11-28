@@ -7,9 +7,13 @@ const Database = require('better-sqlite3');
 const { SerialPort } = require('serialport');
 const XLSX = require('xlsx');
 const { checkTrialLicense } = require('./license.cjs');
+const { loadNetworkConfig, startCentralAuthServer, createCentralAuthRequest } = require('./central-auth.cjs');
 
 let db;
 let authSession = null;
+let networkConfig = { mode: 'standalone' };
+let remoteAuthToken = '';
+let centralAuthServer = null;
 const loginFailures = new Map();
 let tcpSocket = null;
 let serialDevice = null;
@@ -218,6 +222,58 @@ function seedDefaultAccounts() {
 }
 
 function registerAuthHandlers() {
+  if (networkConfig.mode === 'client') {
+    const remoteCall = (action, payload = {}) =>
+      createCentralAuthRequest(networkConfig, action, payload, remoteAuthToken);
+
+    ipcMain.handle('auth:status', async () => {
+      authSession = null;
+      remoteAuthToken = '';
+      return remoteCall('status');
+    });
+    ipcMain.handle('auth:setup', () => {
+      throw new Error('إعداد الحسابات يتم من جهاز المركز فقط.');
+    });
+    ipcMain.handle('auth:login', async (_event, input = {}) => {
+      const result = await remoteCall('login', input);
+      remoteAuthToken = result.token;
+      authSession = result.user;
+      return result.user;
+    });
+    ipcMain.handle('auth:change-password', async (_event, input = {}) => {
+      if (!remoteAuthToken) throw new Error('سجّل الدخول أولًا.');
+      const user = await remoteCall('change-password', input);
+      authSession = user;
+      return user;
+    });
+    ipcMain.handle('auth:update-account', async (_event, input = {}) => {
+      if (!remoteAuthToken) throw new Error('سجّل الدخول أولًا.');
+      const user = await remoteCall('update-account', input);
+      authSession = user;
+      return user;
+    });
+    ipcMain.handle('auth:users', async () => remoteCall('users'));
+    ipcMain.handle('auth:add-user', async (_event, input = {}) => remoteCall('add-user', input));
+    ipcMain.handle('auth:reset-user-password', async (_event, input = {}) => remoteCall('reset-user-password', input));
+    ipcMain.handle('auth:set-user-active', async (_event, input = {}) => remoteCall('set-user-active', input));
+    ipcMain.handle('auth:delete-user', async (_event, input = {}) => remoteCall('delete-user', input));
+    ipcMain.handle('auth:logout', async () => {
+      try {
+        if (remoteAuthToken) await remoteCall('logout');
+      } finally {
+        remoteAuthToken = '';
+        authSession = null;
+        if (serialDevice?.isOpen) {
+          await new Promise(resolve => serialDevice.close(() => resolve()));
+          serialDevice = null;
+        }
+        if (tcpSocket) { tcpSocket.destroy(); tcpSocket = null; }
+      }
+      return true;
+    });
+    return;
+  }
+
   ipcMain.handle('auth:status', async () => {
     authSession = null;
     if (serialDevice?.isOpen) {
@@ -757,7 +813,7 @@ ipcMain.handle('tcp:write', (_event, data) => {
 });
 ipcMain.handle('tcp:disconnect', () => { tcpSocket?.destroy(); tcpSocket = null; return true; });
 
-app.whenReady().then(() => {
+app.whenReady().then(async () => {
   const license = checkTrialLicense(app.getPath('appData'));
   if (!license.allowed) {
     dialog.showErrorBox(
@@ -768,11 +824,35 @@ app.whenReady().then(() => {
     return;
   }
 
+  try {
+    networkConfig = loadNetworkConfig(path.join(app.getPath('userData'), 'network.json'));
+  } catch (error) {
+    dialog.showErrorBox('إعداد الاتصال المركزي غير صحيح', error?.message || String(error));
+    app.quit();
+    return;
+  }
+
   openDatabase();
-  seedDefaultAccounts();
-  // Operator accounts use the password assigned by the supervisor immediately; no forced first-login reset.
-  db.prepare("UPDATE app_users SET must_change_password=0 WHERE role='operator' AND must_change_password<>0").run();
+  if (networkConfig.mode !== 'client') {
+    seedDefaultAccounts();
+    // Operator accounts use the password assigned by the supervisor immediately; no forced first-login reset.
+    db.prepare("UPDATE app_users SET must_change_password=0 WHERE role='operator' AND must_change_password<>0").run();
+  }
   registerAuthHandlers();
+
+  if (networkConfig.mode === 'host') {
+    try {
+      centralAuthServer = await startCentralAuthServer({ db, config: networkConfig });
+      console.log('Central authentication server listening on ' + networkConfig.bindAddress + ':' + networkConfig.port);
+    } catch (error) {
+      dialog.showErrorBox(
+        'تعذر تشغيل خادم الحسابات المركزي',
+        (error?.message || String(error)) + '\nتأكد من أن المنفذ ' + networkConfig.port + ' غير مستخدم وأن إعداد الشبكة صحيح.'
+      );
+      app.quit();
+      return;
+    }
+  }
 
   // Avoid rebuilding the entire Excel workbook before the window appears.
   const initialRecords = getStoredRecords();
@@ -803,5 +883,5 @@ app.whenReady().then(() => {
 
   app.on('activate', () => { if (BrowserWindow.getAllWindows().length === 0) createWindow(); });
 });
-app.on('before-quit', () => { tcpSocket?.destroy(); if (serialDevice?.isOpen) serialDevice.close(); db?.close(); });
+app.on('before-quit', () => { centralAuthServer?.close(); tcpSocket?.destroy(); if (serialDevice?.isOpen) serialDevice.close(); db?.close(); });
 app.on('window-all-closed', () => { if (process.platform !== 'darwin') app.quit(); });
