@@ -581,7 +581,7 @@ html.operator-dashboard-only .operator-logout-button[hidden]{
 /* Supervisor user administration */
 .supervisor-users-panel{margin:14px 0}
 .supervisor-users-panel .table-wrap{overflow-x:auto}
-.supervisor-users-panel table{min-width:720px}
+.supervisor-users-panel table{min-width:540px}
 .supervisor-users-panel .table-actions{display:flex;flex-wrap:wrap;gap:6px}
 .supervisor-users-panel .table-action{white-space:nowrap}
 .user-state{display:inline-flex;align-items:center;padding:4px 9px;border-radius:20px;font-size:10px;font-weight:700}
@@ -737,4 +737,85 @@ tbody tr:hover td{background:#fbfaf6}
 @media print{
   #ticketModal .ticket-modal{background:#fff!important;color:#111!important}
   #ticketModal .ticket-paper{color:#111!important}
+}
+
+
+/* Customer and company directory: instant search with readable controls. */
+.customer-directory-toolbar {
+  grid-template-columns: minmax(0, 1fr) minmax(165px, 205px) minmax(165px, 205px);
+  align-items: center;
+}
+.customer-directory-toolbar .search-input,
+.customer-directory-toolbar .directory-filter {
+  height: 58px;
+  min-height: 58px;
+  font-size: 14px;
+  padding: 13px 15px;
+}
+.customer-directory-toolbar .search-input {
+  font-size: 15px;
+}
+.customer-directory-toolbar .directory-filter {
+  width: 100%;
+  background: #fff;
+  border: 1px solid #dce1e8;
+  border-radius: 9px;
+  color: #18263d;
+  outline: none;
+}
+.customer-directory-toolbar .directory-filter:focus {
+  border-color: #c99b3b;
+  box-shadow: 0 0 0 3px #c99b3b20;
+}
+.directory-entity-type {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 11px;
+  border-radius: 20px;
+  font-size: 11px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+.directory-entity-type.customer {
+  color: #31527f;
+  background: #eaf0f8;
+}
+.directory-entity-type.company {
+  color: #8a641b;
+  background: #f7f0df;
+}
+.database-table {
+  min-width: 1120px;
+}
+.database-table .record-user-cell {
+  font-weight: 700;
+  white-space: nowrap;
+}
+.report-database-actions {
+  display: flex;
+  align-items: center;
+  gap: 5px;
+  white-space: nowrap;
+}
+.report-database-actions .table-action {
+  padding: 7px 9px;
+}
+@media (max-width: 820px) {
+  .customer-directory-toolbar {
+    grid-template-columns: 1fr 1fr;
+  }
+  .customer-directory-toolbar .search-input {
+    grid-column: 1 / -1;
+  }
+}
+@media (max-width: 520px) {
+  .customer-directory-toolbar {
+    grid-template-columns: 1fr;
+  }
+  .customer-directory-toolbar .search-input {
+    grid-column: auto;
+  }
+  .report-database-actions {
+    flex-wrap: wrap;
+  }
 }
