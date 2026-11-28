@@ -2055,10 +2055,21 @@
 
   let supervisorPasswordResetUserId = null;
 
+  function resetSupervisorPasswordVisibility() {
+    ['supervisorResetPassword', 'supervisorResetPasswordConfirm'].forEach(id => {
+      $(id).type = 'password';
+    });
+    document.querySelectorAll('#supervisorResetPasswordModal [data-toggle-password]').forEach(toggle => {
+      toggle.setAttribute('aria-pressed', 'false');
+      toggle.setAttribute('aria-label', 'إظهار كلمة المرور');
+    });
+  }
+
   function openSupervisorPasswordResetModal(userId, userName) {
     if (activeUser?.role !== 'supervisor') return;
     supervisorPasswordResetUserId = userId;
     $('supervisorResetPasswordForm').reset();
+    resetSupervisorPasswordVisibility();
     $('supervisorResetPasswordUser').textContent = userName || 'المستخدم';
     $('supervisorResetPasswordMessage').textContent = '';
     $('supervisorResetPasswordMessage').classList.remove('is-error');
@@ -2070,6 +2081,7 @@
   function closeSupervisorPasswordResetModal() {
     $('supervisorResetPasswordModal').classList.remove('open');
     $('supervisorResetPasswordForm').reset();
+    resetSupervisorPasswordVisibility();
     $('supervisorResetPasswordMessage').textContent = '';
     $('supervisorResetPasswordMessage').classList.remove('is-error');
     supervisorPasswordResetUserId = null;
