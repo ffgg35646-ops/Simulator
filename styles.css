@@ -930,3 +930,137 @@ html.operator-dashboard-only .inline-message{
   html.operator-dashboard-only #ticketDetailsFields.form-grid{gap:10px}
 }
 
+
+
+/* Operator dashboard: white and gold finish, with wider fields. */
+html.operator-dashboard-only body{
+  background:#f5f6f8!important;
+  color:#172744!important;
+}
+html.operator-dashboard-only .main-area{
+  color:#172744!important;
+}
+html.operator-dashboard-only .topbar{
+  border-bottom-color:#e5e8ed!important;
+}
+html.operator-dashboard-only .operator-brand-title>span{
+  display:inline-flex;
+  align-items:center;
+  gap:11px;
+  color:#172744!important;
+  font-weight:800;
+}
+html.operator-dashboard-only .operator-brand-title>span::before{
+  content:"⚖";
+  display:inline-grid;
+  place-items:center;
+  width:38px;
+  height:38px;
+  border-radius:12px;
+  background:linear-gradient(145deg,#fff9e9,#f1e2bd);
+  border:1px solid #e3c77f;
+  color:#a77a25;
+  font-size:21px;
+  box-shadow:0 4px 12px #b4872f20;
+}
+html.operator-dashboard-only .capture-panel,
+html.operator-dashboard-only .scale-panel{
+  background:#fff!important;
+  border:1px solid #e6dfcf!important;
+  box-shadow:0 8px 26px #1727440c!important;
+  border-radius:18px!important;
+}
+html.operator-dashboard-only .panel-heading h3{
+  color:#172744!important;
+}
+html.operator-dashboard-only .panel-heading h3::before{
+  content:"";
+  display:inline-block;
+  width:7px;
+  height:19px;
+  margin-left:9px;
+  vertical-align:-4px;
+  border-radius:8px;
+  background:linear-gradient(180deg,#e6c879,#b4872f);
+}
+html.operator-dashboard-only .weight-display{
+  background:linear-gradient(145deg,#fffefa,#f8f3e7)!important;
+  border:1px solid #e4d2a5!important;
+  box-shadow:inset 0 1px #fff,0 5px 18px #b4872f0c;
+}
+html.operator-dashboard-only .weight-caption,
+html.operator-dashboard-only .weight-meta,
+html.operator-dashboard-only .capacity-labels{
+  color:#687487!important;
+}
+html.operator-dashboard-only .weight-value{
+  color:#b4872f!important;
+}
+html.operator-dashboard-only .weight-value span{
+  color:#8a6a2b!important;
+}
+html.operator-dashboard-only .stable-indicator{
+  color:#9b762d!important;
+}
+html.operator-dashboard-only .capacity-track{
+  background:#eee7d8!important;
+}
+html.operator-dashboard-only .capacity-track div{
+  background:linear-gradient(90deg,#b4872f,#e8cc82)!important;
+}
+html.operator-dashboard-only .manual-entry{
+  background:#fffdf8!important;
+  border:1px solid #eadfca!important;
+  box-shadow:0 3px 12px #17274408;
+}
+html.operator-dashboard-only .capture-area{
+  background:#fff!important;
+  border:1px solid #e8e2d6!important;
+  box-shadow:0 3px 14px #17274408;
+}
+html.operator-dashboard-only #ticketDetailsFields.form-grid{
+  max-width:1120px!important;
+  gap:16px 20px!important;
+}
+html.operator-dashboard-only .manual-entry,
+html.operator-dashboard-only .capture-area{
+  width:min(1160px,100%)!important;
+}
+html.operator-dashboard-only .manual-weight-row.weight-input-pair{
+  gap:18px!important;
+}
+html.operator-dashboard-only .manual-weight-row.weight-input-pair input{
+  width:100%!important;
+  border-color:#d8c99f!important;
+  box-shadow:0 2px 8px #17274408;
+}
+html.operator-dashboard-only #ticketDetailsFields.form-grid input,
+html.operator-dashboard-only #ticketDetailsFields.form-grid select{
+  border-color:#d8c99f!important;
+  box-shadow:0 2px 8px #17274408;
+}
+html.operator-dashboard-only #ticketDetailsFields.form-grid input:focus,
+html.operator-dashboard-only #ticketDetailsFields.form-grid select:focus,
+html.operator-dashboard-only .manual-weight-row.weight-input-pair input:focus{
+  border-color:#b88b35!important;
+  box-shadow:0 0 0 3px #c49a4522!important;
+}
+html.operator-dashboard-only .btn-primary{
+  background:linear-gradient(135deg,#e7cb83,#bd913b)!important;
+  color:#172744!important;
+  border:1px solid #c49a45!important;
+  box-shadow:0 5px 14px #b4872f24!important;
+}
+html.operator-dashboard-only .btn-outline{
+  background:#fff!important;
+  border-color:#d8c99f!important;
+  color:#76591f!important;
+}
+html.operator-dashboard-only .btn-outline:hover{
+  background:#fcf8ed!important;
+  border-color:#b88b35!important;
+}
+html.operator-dashboard-only .manual-tag{
+  background:#f5ecd7!important;
+  color:#8a6726!important;
+}
