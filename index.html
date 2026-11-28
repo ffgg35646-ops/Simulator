@@ -18,8 +18,8 @@
         <h1>تسجيل الدخول</h1>
         <p class="auth-description">اكتب بيانات الحساب للمتابعة إلى البرنامج.</p>
         <form id="authLoginForm" class="auth-form">
-          <label>اسم المستخدم أو البريد الإلكتروني
-            <input id="authIdentifier" autocomplete="username" placeholder="scale01 أو البريد الإلكتروني للمشرف" required />
+          <label>اسم المستخدم أو الاسم الذي حدده المشرف
+            <input id="authIdentifier" autocomplete="username" placeholder="اكتب اسم المستخدم أو الاسم الذي حدده المشرف" required />
           </label>
           <label>كلمة المرور
             <div class="password-field"><input id="authPassword" type="password" autocomplete="current-password" placeholder="كلمة المرور" required /><button class="password-visibility" type="button" data-toggle-password="authPassword" aria-label="إظهار كلمة المرور" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg></button></div>
@@ -58,8 +58,7 @@
         <button class="nav-link" data-view="vehicles"><span class="nav-icon">▰</span> السيارات والعملاء</button>
         <button class="nav-link" data-view="reports"><span class="nav-icon">▥</span> التقارير</button>
         <button class="nav-link" data-view="user-management"><span class="nav-icon">♙</span> إدارة المستخدمين</button>
-        <button class="nav-link" data-view="customers"><span class="nav-icon">♧</span> العملاء</button>
-        <button class="nav-link" data-view="companies"><span class="nav-icon">▣</span> الشركات</button>
+        <button class="nav-link" data-view="customers"><span class="nav-icon">♧</span> العملاء والشركات</button>
         <button class="nav-link" data-view="devices">الأجهزة والاتصال</button>
       </nav>
       <div class="sidebar-bottom">
@@ -144,29 +143,34 @@
             <select id="supervisorReportFilter"><option value="all">كل المستخدمين</option></select>
           </label>
         </div>
-<div class="stats-grid"><article class="stat-card"><div class="stat-icon teal">▤</div><div><span>إجمالي العمليات</span><strong id="reportCount">0</strong></div></article><article class="stat-card"><div class="stat-icon blue">▰</div><div><span>إجمالي صافي الوزن</span><strong id="reportNet">0 كجم</strong></div></article><article class="stat-card"><div class="stat-icon amber">◉</div><div><span>متوسط الحمولة</span><strong id="reportAverage">0 كجم</strong></div></article></div><div class="panel"><div class="panel-heading report-records-heading"><div><h3>قاعدة البيانات</h3><small></small></div><button class="btn btn-danger-ghost" type="button" data-delete-all-records>حذف جميع السجلات</button></div><div class="table-wrap"><table><thead><tr><th>السيارة</th><th>المقطورة</th><th>الوزنة الأولى</th><th>الوزنة الثانية</th><th>الصافي</th><th>التاريخ</th><th>صادر / وارد</th></tr></thead><tbody id="reportRecordsTable"><tr class="empty-row"><td colspan="7">لا توجد عمليات مسجلة</td></tr></tbody></table></div></div>
+<div class="stats-grid"><article class="stat-card"><div class="stat-icon teal">▤</div><div><span>إجمالي العمليات</span><strong id="reportCount">0</strong></div></article><article class="stat-card"><div class="stat-icon blue">▰</div><div><span>إجمالي صافي الوزن</span><strong id="reportNet">0 كجم</strong></div></article><article class="stat-card"><div class="stat-icon amber">◉</div><div><span>متوسط الحمولة</span><strong id="reportAverage">0 كجم</strong></div></article></div><div class="panel"><div class="panel-heading report-records-heading"><div><h3>قاعدة البيانات</h3><small></small></div><button class="btn btn-danger-ghost" type="button" data-delete-all-records>حذف جميع السجلات</button></div><div class="table-wrap"><table class="database-table"><thead><tr><th>اسم المستخدم</th><th>السيارة</th><th>المقطورة</th><th>الوزنة الأولى</th><th>الوزنة الثانية</th><th>الصافي</th><th>التاريخ</th><th>صادر / وارد</th><th>الإجراءات</th></tr></thead><tbody id="reportRecordsTable"><tr class="empty-row"><td colspan="9">لا توجد عمليات مسجلة</td></tr></tbody></table></div></div>
 </section>
 
       <section class="view" id="view-user-management">
         <div class="section-intro"><div><h2>إدارة المستخدمين</h2><p>إضافة حسابات التشغيل وتغيير كلمات المرور وتفعيل الحسابات أو إيقافها.</p></div><div class="record-actions"><button class="btn btn-primary" type="button" id="supervisorAddUser">إضافة مستخدم</button></div></div>
         <div class="panel supervisor-users-panel"><div class="panel-heading"><div><h3>حسابات التشغيل</h3><small>إدارة صلاحيات دخول المستخدمين</small></div><span class="record-count">المستخدمون</span></div>
-          <div class="table-wrap"><table><thead><tr><th>الاسم</th><th>اسم الدخول</th><th>الحالة</th><th>كلمة المرور</th><th>الإجراءات</th></tr></thead><tbody id="supervisorUsersTable"><tr class="empty-row"><td colspan="5">جارٍ تحميل المستخدمين...</td></tr></tbody></table></div>
+          <div class="table-wrap"><table><thead><tr><th>الاسم</th><th>الحالة</th><th>الإجراءات</th></tr></thead><tbody id="supervisorUsersTable"><tr class="empty-row"><td colspan="3">جارٍ تحميل المستخدمين...</td></tr></tbody></table></div>
         </div>
       </section>
 
       <section class="view" id="view-customers">
-        <div class="section-intro"><div><h2>العملاء</h2><p>قائمة العملاء المسجلين في عمليات الوزن.</p></div></div>
-        <div class="panel customer-directory-panel"><div class="panel-heading"><div><h3>سجل العملاء</h3><small>البيانات مستخرجة من عمليات الوزن المسجلة</small></div><span class="record-count" id="customersDirectoryCount">0 عميل</span></div>
-          <div class="customer-directory-toolbar"><input id="customersDirectorySearch" class="search-input" type="search" placeholder="ابحث باسم العميل أو السيارة أو السائق أو الشحنة أو رقم التذكرة..." /></div>
-          <div class="table-wrap"><table><thead><tr><th>اسم العميل</th><th>عدد العمليات</th><th>آخر سيارة</th><th>آخر سائق</th><th>آخر شحنة</th><th>آخر صافي وزن</th><th>آخر تسجيل</th></tr></thead><tbody id="customersDirectoryTable"><tr class="empty-row"><td colspan="7">لا توجد بيانات عملاء</td></tr></tbody></table></div>
-        </div>
-      </section>
-
-      <section class="view" id="view-companies">
-        <div class="section-intro"><div><h2>الشركات</h2><p>قائمة الشركات المسجلة في عمليات الوزن.</p></div></div>
-        <div class="panel customer-directory-panel"><div class="panel-heading"><div><h3>سجل الشركات</h3><small>البيانات مستخرجة من عمليات الوزن المسجلة</small></div><span class="record-count" id="companiesDirectoryCount">0 شركة</span></div>
-          <div class="customer-directory-toolbar"><input id="companiesDirectorySearch" class="search-input" type="search" placeholder="ابحث باسم الشركة أو السيارة أو السائق أو الشحنة أو رقم التذكرة..." /></div>
-          <div class="table-wrap"><table><thead><tr><th>اسم الشركة</th><th>عدد العمليات</th><th>آخر سيارة</th><th>آخر سائق</th><th>آخر شحنة</th><th>آخر صافي وزن</th><th>آخر تسجيل</th></tr></thead><tbody id="companiesDirectoryTable"><tr class="empty-row"><td colspan="7">لا توجد بيانات شركات</td></tr></tbody></table></div>
+        <div class="section-intro"><div><h2>العملاء والشركات</h2><p>سجل موحد للعملاء والشركات مع بحث فوري وفلاتر حسب نوع الجهة والحركة.</p></div></div>
+        <div class="panel customer-directory-panel">
+          <div class="panel-heading"><div><h3>سجل العملاء والشركات</h3><small>تظهر النتائج فور الكتابة أو تغيير الفلاتر</small></div><span class="record-count" id="customersDirectoryCount">0 جهة</span></div>
+          <div class="customer-directory-toolbar">
+            <input id="customersDirectorySearch" class="search-input" type="search" placeholder="ابحث باسم العميل أو الشركة..." autocomplete="off" />
+            <select id="directoryTypeFilter" class="directory-filter" aria-label="فلترة حسب نوع الجهة">
+              <option value="all">كل الجهات</option>
+              <option value="customer">عميل</option>
+              <option value="company">شركة</option>
+            </select>
+            <select id="directoryMovementFilter" class="directory-filter" aria-label="فلترة حسب نوع الحركة">
+              <option value="all">كل الحركات</option>
+              <option value="صادر">صادر</option>
+              <option value="وارد">وارد</option>
+            </select>
+          </div>
+          <div class="table-wrap"><table><thead><tr><th>اسم العميل / الشركة</th><th>التصنيف</th><th>عدد العمليات</th><th>آخر حركة</th><th>آخر سيارة</th><th>آخر سائق</th><th>آخر شحنة</th><th>آخر صافي وزن</th><th>آخر تسجيل</th></tr></thead><tbody id="customersDirectoryTable"><tr class="empty-row"><td colspan="9">لا توجد بيانات عملاء أو شركات</td></tr></tbody></table></div>
         </div>
       </section>
 
@@ -422,18 +426,12 @@
     <section class="account-settings-card" role="dialog" aria-modal="true" aria-labelledby="supervisorUserTitle">
       <div class="modal-heading"><h3 id="supervisorUserTitle">إضافة مستخدم جديد</h3><button type="button" id="closeSupervisorUser" aria-label="إغلاق">×</button></div>
       <form id="supervisorUserForm" class="account-settings-form">
-        <p class="supervisor-user-note">سيتم إنشاء حساب مستخدم تشغيل جديد، ويمكنه الدخول باسم المستخدم وكلمة المرور المحددين هنا.</p>
-        <label>الاسم الظاهر
-          <input id="supervisorUserDisplayName" type="text" minlength="2" maxlength="80" autocomplete="name" required />
-        </label>
-        <label>اسم المستخدم للدخول
-          <input id="supervisorUserUsername" type="text" minlength="3" maxlength="64" autocomplete="off" required />
+        <p class="supervisor-user-note">يدخل المستخدم بالاسم وكلمة المرور اللذين تحددهما هنا.</p>
+        <label>اسم المستخدم
+          <input id="supervisorUserDisplayName" type="text" minlength="2" maxlength="80" autocomplete="name" placeholder="اسم المستخدم" required />
         </label>
         <label>كلمة المرور
-          <input id="supervisorUserPassword" type="password" minlength="3" maxlength="128" autocomplete="new-password" required />
-        </label>
-        <label>تأكيد كلمة المرور
-          <input id="supervisorUserPasswordConfirm" type="password" minlength="3" maxlength="128" autocomplete="new-password" required />
+          <input id="supervisorUserPassword" type="password" minlength="3" maxlength="128" autocomplete="new-password" placeholder="كلمة المرور" required />
         </label>
         <p class="account-form-message" id="supervisorUserMessage" role="status"></p>
         <div class="account-form-actions">
