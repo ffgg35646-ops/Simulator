@@ -862,11 +862,12 @@
       '<td>'+esc(r.trailer || '—')+'</td>' +
       '<td class="report-date-cell">'+esc(operationDate)+'</td>' +
       '<td><strong class="net-cell">'+fmt(r.netWeight)+' كجم</strong></td>' +
+      '<td>'+fmt(r.firstWeight)+'</td><td>'+fmt(r.secondWeight)+'</td>' +
+      '<td>'+esc(r.governorate || '—')+'</td>' +
       ownerCell +
       '<td>'+esc(r.movementType || '—')+'</td><td>'+esc(r.driver || '—')+'</td>' +
       '<td>'+esc(r.customer || '—')+'</td><td>'+esc(r.shipment || '—')+'</td>' +
-      '<td>'+esc(r.governorate || '—')+'</td><td>'+fmt(r.firstWeight)+'</td>' +
-      '<td>'+fmt(r.secondWeight)+'</td><td><div class="table-actions">'+editAction+
+      '<td><div class="table-actions">'+editAction+
       '<button class="table-action" data-ticket="'+esc(r.id)+'">التذكرة</button>'+
       '<button class="table-action" data-export-ticket="'+esc(r.id)+'">تصدير Excel</button>'+deleteAction+'</div></td></tr>';
   }
