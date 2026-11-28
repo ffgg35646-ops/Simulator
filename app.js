@@ -866,7 +866,8 @@
       '<td>' + esc(r.movementType || '—') + '</td>' +
       '<td><div class="report-database-actions">' +
         '<button class="table-action" data-export-ticket="' + esc(r.id) + '">تصدير Excel</button>' +
-        '<button class="table-action" data-print-record="' + esc(r.id) + '">طباعة</button>' +
+        '<button class="table-action" data-print-excel-ticket="' + esc(r.id) + '">طباعة Excel</button>' +
+        '<button class="table-action" data-print-record="' + esc(r.id) + '">طباعة بون</button>' +
         '<button class="table-action" data-edit-record="' + esc(r.id) + '">تعديل</button>' +
       '</div></td>' +
       '</tr>';
@@ -1569,8 +1570,8 @@
     return ownerFilter === 'all' ? records.slice() : records.filter(record => record.createdByUserId === ownerFilter);
   }
 
-  function printExcelReport() {
-    const exportRecords = getReportExportRecords();
+  function printExcelReport(recordsToPrint = getReportExportRecords(), reportTitle = 'تقرير سجل الوزن') {
+    const exportRecords = recordsToPrint;
     if (!exportRecords.length) { showToast('لا توجد عمليات لطباعتها'); return; }
     const rows = exportRecords.map(excelRowForRecord);
     const columns = Object.keys(rows[0] || {});
@@ -1587,7 +1588,7 @@
     const printArea = document.createElement('section');
     printArea.id = 'weightReportPrintArea';
     printArea.innerHTML = `
-      <h2>تقرير سجل الوزن</h2>
+      <h2>${escapeHtml(reportTitle)}</h2>
       <p>تاريخ الطباعة: ${escapeHtml(new Date().toLocaleString('ar-EG'))}</p>
       <table dir="rtl"><thead><tr>${tableHead}</tr></thead><tbody>${tableRows}</tbody></table>
     `;
@@ -1629,6 +1630,12 @@
       cleanup();
       showToast('تعذرت طباعة التقرير: ' + error.message);
     }
+  }
+
+  function printExcelTicket(recordId) {
+    const record = records.find(item => String(item.id) === String(recordId));
+    if (!record) { showToast('لم يتم العثور على العملية المطلوبة للطباعة'); return; }
+    printExcelReport([record], 'بيانات التذكرة - نسخة Excel');
   }
 
   async function exportExcel() {
@@ -1968,6 +1975,8 @@
   document.addEventListener('click',e=>{
     const editButton = e.target.closest('[data-edit-record]');
     if (editButton) { openSupervisorEditModal(editButton.dataset.editRecord); return; }
+    const printExcelButton = e.target.closest('[data-print-excel-ticket]');
+    if (printExcelButton) { printExcelTicket(printExcelButton.dataset.printExcelTicket); return; }
     const printRecordButton = e.target.closest('[data-print-record]');
     if (printRecordButton) { printRecordTicket(printRecordButton.dataset.printRecord); return; }
     const deleteButton = e.target.closest('[data-delete-record]');
@@ -2215,9 +2224,19 @@
     }
   });
 
+  function resetSupervisorUserPasswordVisibility() {
+    $('supervisorUserPassword').type = 'password';
+    const toggle = document.querySelector('#supervisorUserModal [data-toggle-password="supervisorUserPassword"]');
+    if (toggle) {
+      toggle.setAttribute('aria-pressed', 'false');
+      toggle.setAttribute('aria-label', 'إظهار كلمة المرور');
+    }
+  }
+
   function openSupervisorUserModal() {
     if (activeUser?.role !== 'supervisor') return;
     $('supervisorUserForm').reset();
+    resetSupervisorUserPasswordVisibility();
     const message = $('supervisorUserMessage');
     message.textContent = '';
     message.classList.remove('is-error');
@@ -2228,6 +2247,7 @@
   function closeSupervisorUserModal() {
     $('supervisorUserModal').classList.remove('open');
     $('supervisorUserForm').reset();
+    resetSupervisorUserPasswordVisibility();
     $('supervisorUserMessage').textContent = '';
     $('supervisorUserMessage').classList.remove('is-error');
   }
