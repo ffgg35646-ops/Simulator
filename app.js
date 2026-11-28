@@ -844,9 +844,33 @@
     $('reportNet').textContent = fmt(total)+' كجم';
     $('reportAverage').textContent = fmt(filtered.length ? Math.round(total/filtered.length) : 0)+' كجم';
     const emptyColumns = activeUser?.role === 'supervisor' ? 14 : 13;
-    $('reportRecordsTable').innerHTML = filtered.length ? filtered.map(r=>rowMarkup(r,true)).join('') : '<tr class="empty-row"><td colspan="'+emptyColumns+'">'+(reportSource.length ? 'لا توجد نتائج مطابقة للبحث' : 'لا توجد عمليات مسجلة')+'</td></tr>';
+    $('reportRecordsTable').innerHTML = filtered.length ? filtered.map(r=>reportRowMarkup(r)).join('') : '<tr class="empty-row"><td colspan="'+emptyColumns+'">'+(reportSource.length ? 'لا توجد نتائج مطابقة للبحث' : 'لا توجد عمليات مسجلة')+'</td></tr>';
     renderCustomerDirectory();
   }
+  function reportRowMarkup(r) {
+    const ownerCell = activeUser?.role === 'supervisor'
+      ? '<td>'+esc(r.createdByUserName || 'غير محدد')+'</td>'
+      : '';
+    const editAction = activeUser?.role === 'supervisor'
+      ? '<button class="table-action" data-edit-record="'+esc(r.id)+'">تعديل</button>'
+      : '';
+    const deleteAction = activeUser?.role === 'supervisor'
+      ? ''
+      : '<button class="table-action delete-row-action" data-delete-record="'+esc(r.id)+'">حذف</button>';
+    const operationDate = r.createdAt ? stamp(new Date(r.createdAt)) : '—';
+    return '<tr><td><strong>'+esc(r.id)+'</strong></td>' +
+      '<td class="report-date-cell">'+esc(operationDate)+'</td>' +
+      '<td><strong class="net-cell">'+fmt(r.netWeight)+' كجم</strong></td>' +
+      ownerCell +
+      '<td>'+esc(r.movementType || '—')+'</td><td>'+esc(r.plate || '—')+'</td>' +
+      '<td>'+esc(r.trailer || '—')+'</td><td>'+esc(r.driver || '—')+'</td>' +
+      '<td>'+esc(r.customer || '—')+'</td><td>'+esc(r.shipment || '—')+'</td>' +
+      '<td>'+esc(r.governorate || '—')+'</td><td>'+fmt(r.firstWeight)+'</td>' +
+      '<td>'+fmt(r.secondWeight)+'</td><td><div class="table-actions">'+editAction+
+      '<button class="table-action" data-ticket="'+esc(r.id)+'">التذكرة</button>'+
+      '<button class="table-action" data-export-ticket="'+esc(r.id)+'">تصدير Excel</button>'+deleteAction+'</div></td></tr>';
+  }
+
   function renderCustomerDirectory() {
     const query = ($('customerDirectorySearch')?.value || '').trim().toLocaleLowerCase('ar');
     const type = $('customerDirectoryType')?.value || 'all';
