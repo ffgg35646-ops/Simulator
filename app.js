@@ -2019,10 +2019,69 @@ th { background:#e9edf0 !important; font-weight:bold; } tr { break-inside:avoid;
         select.appendChild(option);
       });
       renderReports();
+      renderSupervisorUserManagement(users);
     } catch (error) {
       showToast('تعذر تحميل قائمة المستخدمين: ' + error.message);
     }
   }
+
+  function renderSupervisorUserManagement(users) {
+    const body = $('supervisorUsersTable');
+    if (!body) return;
+    if (!users.length) {
+      body.innerHTML = '<tr class="empty-row"><td colspan="5">لا يوجد مستخدمون حتى الآن</td></tr>';
+      return;
+    }
+    body.innerHTML = users.map(user => {
+      const status = user.isActive ? '<span class="user-state is-active">نشط</span>' : '<span class="user-state is-disabled">موقوف</span>';
+      const activeAction = user.isActive
+        ? '<button class="table-action" data-user-toggle="'+esc(user.id)+'" data-active="0">إيقاف</button>'
+        : '<button class="table-action" data-user-toggle="'+esc(user.id)+'" data-active="1">تفعيل</button>';
+      return '<tr><td>'+esc(user.displayName)+'</td><td>'+esc(user.username)+'</td><td>'+status+'</td><td>'+(user.mustChangePassword ? 'مطالب بالتغيير' : '—')+'</td><td><div class="table-actions"><button class="table-action" data-user-password="'+esc(user.id)+'" data-user-name="'+esc(user.displayName)+'">تغيير كلمة المرور</button>'+activeAction+'<button class="table-action delete-row-action" data-user-delete="'+esc(user.id)+'" data-user-name="'+esc(user.displayName)+'">حذف</button></div></td></tr>';
+    }).join('');
+  }
+
+  $('supervisorUsersTable')?.addEventListener('click', async event => {
+    if (activeUser?.role !== 'supervisor') return;
+    const passwordButton = event.target.closest('[data-user-password]');
+    const toggleButton = event.target.closest('[data-user-toggle]');
+    const deleteButton = event.target.closest('[data-user-delete]');
+    try {
+      if (passwordButton) {
+        const userId = passwordButton.dataset.userPassword;
+        const userName = passwordButton.dataset.userName || 'المستخدم';
+        const password = window.prompt('اكتب كلمة المرور الجديدة للمستخدم: ' + userName);
+        if (password === null) return;
+        if (password.length < 3 || password.length > 128) { showToast('كلمة المرور يجب أن تكون من 3 إلى 128 حرفًا'); return; }
+        const confirmation = window.prompt('أعد كتابة كلمة المرور للتأكيد:');
+        if (confirmation === null) return;
+        if (password !== confirmation) { showToast('كلمتا المرور غير متطابقتين'); return; }
+        await window.desktopBridge.resetUserPassword({ userId, password });
+        await populateSupervisorUsers();
+        showToast('تم تغيير كلمة المرور، وسيُطلب من المستخدم تغييرها عند دخوله التالي');
+        return;
+      }
+      if (toggleButton) {
+        const active = toggleButton.dataset.active === '1';
+        const userId = toggleButton.dataset.userToggle;
+        if (!window.confirm(active ? 'هل تريد تفعيل هذا الحساب؟' : 'هل تريد إيقاف هذا الحساب ومنعه من تسجيل الدخول؟')) return;
+        await window.desktopBridge.setUserActive({ userId, active });
+        await populateSupervisorUsers();
+        showToast(active ? 'تم تفعيل الحساب' : 'تم إيقاف الحساب');
+        return;
+      }
+      if (deleteButton) {
+        const userId = deleteButton.dataset.userDelete;
+        const userName = deleteButton.dataset.userName || 'المستخدم';
+        if (!window.confirm('هل تريد حذف حساب ' + userName + ' نهائيًا؟ ستظل عمليات الوزن القديمة محفوظة في قاعدة البيانات.')) return;
+        await window.desktopBridge.deleteUser({ userId });
+        await populateSupervisorUsers();
+        showToast('تم حذف حساب المستخدم');
+      }
+    } catch (error) {
+      showToast(error.message || 'تعذر تنفيذ الإجراء');
+    }
+  });
 
   function openSupervisorUserModal() {
     if (activeUser?.role !== 'supervisor') return;
