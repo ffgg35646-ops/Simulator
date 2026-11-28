@@ -574,3 +574,6 @@ html.operator-dashboard-only .operator-logout-button[hidden]{
 .password-visibility:hover{background:#29404c;color:#65d6c8}
 .password-visibility:focus-visible{outline:2px solid #3bc4b6;outline-offset:2px}
 .password-visibility svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
+
+/* Supervisor customers and companies directory */
+.customer-directory-panel{margin-top:16px}.customer-directory-toolbar{display:grid;grid-template-columns:minmax(0,1fr) minmax(210px,280px);gap:10px;margin-bottom:14px}.customer-directory-toolbar .search-input{max-width:none}.customer-directory-toolbar select{width:100%;background:#0d1820;border:1px solid #2a3b46;border-radius:8px;padding:10px 11px;color:#edf4f7;font-size:11px;outline:none}.customer-directory-toolbar select:focus{border-color:#29b9ae;box-shadow:0 0 0 3px #20c6b715}.customer-directory-panel td strong{color:#e4f1f3}@media(max-width:700px){.customer-directory-toolbar{grid-template-columns:1fr}.customer-directory-toolbar select{min-height:42px}}
