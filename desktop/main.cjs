@@ -348,6 +348,37 @@ function registerAuthHandlers() {
       .all().map(row => ({ id: row.id, username: row.username, displayName: row.display_name }));
   });
 
+  ipcMain.handle('auth:add-user', (_event, input = {}) => {
+    if (!authSession || authSession.role !== 'supervisor') throw new Error('إضافة المستخدمين متاحة للمشرف فقط.');
+
+    const displayName = String(input.displayName || '').trim();
+    const username = String(input.username || '').trim();
+    const password = String(input.password || '');
+
+    if (displayName.length < 2 || displayName.length > 80) {
+      throw new Error('الاسم الظاهر يجب أن يكون من حرفين إلى 80 حرفًا.');
+    }
+    if (username.length < 3 || username.length > 64) {
+      throw new Error('اسم المستخدم يجب أن يكون من 3 إلى 64 حرفًا.');
+    }
+    if (password.length < 3 || password.length > 128) {
+      throw new Error('كلمة المرور يجب أن تكون من 3 إلى 128 حرفًا.');
+    }
+
+    const existing = db.prepare('SELECT id FROM app_users WHERE username = ? COLLATE NOCASE OR email = ? COLLATE NOCASE')
+      .get(username, username);
+    if (existing) throw new Error('اسم المستخدم مستخدم بالفعل. اختر اسمًا آخر.');
+
+    const id = crypto.randomUUID();
+    const salt = crypto.randomBytes(16).toString('hex');
+    db.prepare(`INSERT INTO app_users(id,username,email,display_name,role,password_salt,password_hash,must_change_password)
+      VALUES(?,?,NULL,?,'operator',?,?,0)`)
+      .run(id, username, displayName, salt, passwordHash(password, salt));
+
+    const created = db.prepare('SELECT * FROM app_users WHERE id=?').get(id);
+    return publicUser(created);
+  });
+
   ipcMain.handle('tickets:add-supervisor-record', (_event, input = {}) => {
     if (!authSession || authSession.role !== 'supervisor') throw new Error('إضافة العمليات اليدوية متاحة للمشرف فقط.');
     const id = String(input.id || '').trim();
