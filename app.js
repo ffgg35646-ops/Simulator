@@ -1588,7 +1588,7 @@
     const printArea = document.createElement('section');
     printArea.id = 'weightReportPrintArea';
     printArea.innerHTML = `
-      <p class="weight-report-count">الإجمالي: ${fmt(exportRecords.length)} وزنة</p>
+      <p class="weight-report-count">الإجمالي: ${fmt(exportRecords.length)}</p>
       <table dir="rtl"><thead><tr>${tableHead}</tr></thead><tbody>${tableRows}</tbody></table>
     `;
     const printStyle = document.createElement('style');
