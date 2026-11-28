@@ -858,12 +858,12 @@
       ? ''
       : '<button class="table-action delete-row-action" data-delete-record="'+esc(r.id)+'">حذف</button>';
     const operationDate = r.createdAt ? stamp(new Date(r.createdAt)) : '—';
-    return '<tr><td><strong>'+esc(r.id)+'</strong></td>' +
+    return '<tr><td>'+esc(r.plate || '—')+'</td>' +
+      '<td>'+esc(r.trailer || '—')+'</td>' +
       '<td class="report-date-cell">'+esc(operationDate)+'</td>' +
       '<td><strong class="net-cell">'+fmt(r.netWeight)+' كجم</strong></td>' +
       ownerCell +
-      '<td>'+esc(r.movementType || '—')+'</td><td>'+esc(r.plate || '—')+'</td>' +
-      '<td>'+esc(r.trailer || '—')+'</td><td>'+esc(r.driver || '—')+'</td>' +
+      '<td>'+esc(r.movementType || '—')+'</td><td>'+esc(r.driver || '—')+'</td>' +
       '<td>'+esc(r.customer || '—')+'</td><td>'+esc(r.shipment || '—')+'</td>' +
       '<td>'+esc(r.governorate || '—')+'</td><td>'+fmt(r.firstWeight)+'</td>' +
       '<td>'+fmt(r.secondWeight)+'</td><td><div class="table-actions">'+editAction+
