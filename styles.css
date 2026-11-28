@@ -557,3 +557,12 @@ html.operator-dashboard-only .operator-logout-button[hidden]{
     color: #111 !important;
   }
 }
+
+
+/* Supervisor: create additional operator accounts from the reports screen. */
+.supervisor-user-note{
+  margin:0;
+  color:#8fa6af;
+  font-size:10px;
+  line-height:1.8;
+}

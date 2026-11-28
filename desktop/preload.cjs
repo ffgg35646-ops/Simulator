@@ -7,6 +7,7 @@ contextBridge.exposeInMainWorld('desktopBridge', {
   changePassword: input => ipcRenderer.invoke('auth:change-password', input),
   updateAccount: input => ipcRenderer.invoke('auth:update-account', input),
   listUsers: () => ipcRenderer.invoke('auth:users'),
+  addUser: input => ipcRenderer.invoke('auth:add-user', input),
   addSupervisorRecord: record => ipcRenderer.invoke('tickets:add-supervisor-record', record),
   updateSupervisorRecord: (recordId, record) => ipcRenderer.invoke('tickets:update-supervisor-record', recordId, record),
   logout: () => ipcRenderer.invoke('auth:logout'),

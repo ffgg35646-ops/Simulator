@@ -146,7 +146,7 @@
 
       <section class="view" id="view-vehicles"><div class="section-intro"><div><h2>السيارات والعملاء</h2><p>ملخص السيارات والعملاء الذين ظهرت بياناتهم في التذاكر.</p></div></div><div class="stats-grid compact-stats"><article class="stat-card"><div class="stat-icon teal">▰</div><div><span>عدد السيارات</span><strong id="vehicleCount">0</strong></div></article><article class="stat-card"><div class="stat-icon blue">♙</div><div><span>عدد السائقين</span><strong id="driverCount">0</strong></div></article><article class="stat-card"><div class="stat-icon purple">▣</div><div><span>عدد العملاء</span><strong id="customerCount">0</strong></div></article></div><div class="panel"><div class="panel-heading"><div><h3>السيارات المسجلة تلقائيًا</h3><small>تُستخرج من عمليات الوزن المحفوظة</small></div></div><div class="table-wrap"><table><thead><tr><th>رقم السيارة</th><th>السائق الأخير</th><th>العميل الأخير</th><th>عدد العمليات</th><th>إجمالي صافي الوزن</th></tr></thead><tbody id="vehiclesTable"><tr class="empty-row"><td colspan="5">لا توجد بيانات بعد</td></tr></tbody></table></div></div></section>
 
-      <section class="view" id="view-reports"><div class="section-intro"><div><h2>التقارير والإحصائيات</h2></div><div class="record-actions"><button class="btn btn-primary" type="button" id="supervisorAddRecord" hidden>إضافة</button><button class="btn btn-outline" id="printReport">طباعة التقرير</button></div></div><div class="panel supervisor-report-controls" id="supervisorReportControls" hidden>
+      <section class="view" id="view-reports"><div class="section-intro"><div><h2>التقارير والإحصائيات</h2></div><div class="record-actions"><button class="btn btn-primary" type="button" id="supervisorAddRecord" hidden>إضافة</button><button class="btn btn-outline" type="button" id="supervisorAddUser" hidden>إضافة مستخدم</button><button class="btn btn-outline" id="printReport">طباعة التقرير</button></div></div><div class="panel supervisor-report-controls" id="supervisorReportControls" hidden>
           <label>عرض التقارير حسب المستخدم
             <select id="supervisorReportFilter"><option value="all">كل المستخدمين</option></select>
           </label>
@@ -412,6 +412,32 @@
       </form>
     </section>
   </div>
+  <div class="modal-backdrop" id="supervisorUserModal">
+    <section class="account-settings-card" role="dialog" aria-modal="true" aria-labelledby="supervisorUserTitle">
+      <div class="modal-heading"><h3 id="supervisorUserTitle">إضافة مستخدم جديد</h3><button type="button" id="closeSupervisorUser" aria-label="إغلاق">×</button></div>
+      <form id="supervisorUserForm" class="account-settings-form">
+        <p class="supervisor-user-note">سيتم إنشاء حساب مستخدم تشغيل جديد، ويمكنه الدخول باسم المستخدم وكلمة المرور المحددين هنا.</p>
+        <label>الاسم الظاهر
+          <input id="supervisorUserDisplayName" type="text" minlength="2" maxlength="80" autocomplete="name" required />
+        </label>
+        <label>اسم المستخدم للدخول
+          <input id="supervisorUserUsername" type="text" minlength="3" maxlength="64" autocomplete="off" required />
+        </label>
+        <label>كلمة المرور
+          <input id="supervisorUserPassword" type="password" minlength="3" maxlength="128" autocomplete="new-password" required />
+        </label>
+        <label>تأكيد كلمة المرور
+          <input id="supervisorUserPasswordConfirm" type="password" minlength="3" maxlength="128" autocomplete="new-password" required />
+        </label>
+        <p class="account-form-message" id="supervisorUserMessage" role="status"></p>
+        <div class="account-form-actions">
+          <button class="btn btn-primary" id="saveSupervisorUser" type="submit">إنشاء المستخدم</button>
+          <button class="btn btn-outline" id="cancelSupervisorUser" type="button">إلغاء</button>
+        </div>
+      </form>
+    </section>
+  </div>
+
   <script src="./node_modules/xlsx/dist/xlsx.full.min.js" onerror="this.onerror=null;this.src='https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js'"></script>
   <script src="./app.js"></script>
 </body>
