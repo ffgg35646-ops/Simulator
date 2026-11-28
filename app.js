@@ -1989,7 +1989,7 @@
 
   if (!desktop && !('serial' in navigator)) $('serialState').textContent = 'استخدم Chrome أو Edge على كمبيوتر لعرض منافذ Serial.';
   if (navigator.serial) navigator.serial.addEventListener('disconnect', () => { if (serialPort) disconnectSerial(); });
-  $('printReport').addEventListener('click',printExcelReport);
+  $('printReport').addEventListener('click', () => printExcelReport());
   $('closeTicket').addEventListener('click',()=>$('ticketModal').classList.remove('open'));
   $('closeTicket2').addEventListener('click',()=>$('ticketModal').classList.remove('open'));
   $('printTicket').addEventListener('click',printTicketOnly);
