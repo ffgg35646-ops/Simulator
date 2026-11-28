@@ -2053,6 +2053,41 @@
     }).join('');
   }
 
+  let supervisorPasswordResetUserId = null;
+
+  function resetSupervisorPasswordVisibility() {
+    ['supervisorResetPassword', 'supervisorResetPasswordConfirm'].forEach(id => {
+      $(id).type = 'password';
+    });
+    document.querySelectorAll('#supervisorResetPasswordModal [data-toggle-password]').forEach(toggle => {
+      toggle.setAttribute('aria-pressed', 'false');
+      toggle.setAttribute('aria-label', 'إظهار كلمة المرور');
+    });
+  }
+
+  function openSupervisorPasswordResetModal(userId, userName) {
+    if (activeUser?.role !== 'supervisor') return;
+    supervisorPasswordResetUserId = userId;
+    $('supervisorResetPasswordForm').reset();
+    resetSupervisorPasswordVisibility();
+    $('supervisorResetPasswordUser').textContent = userName || 'المستخدم';
+    $('supervisorResetPasswordMessage').textContent = '';
+    $('supervisorResetPasswordMessage').classList.remove('is-error');
+    $('saveSupervisorResetPassword').disabled = false;
+    $('supervisorResetPasswordModal').classList.add('open');
+    $('supervisorResetPassword').focus();
+  }
+
+  function closeSupervisorPasswordResetModal() {
+    $('supervisorResetPasswordModal').classList.remove('open');
+    $('supervisorResetPasswordForm').reset();
+    resetSupervisorPasswordVisibility();
+    $('supervisorResetPasswordMessage').textContent = '';
+    $('supervisorResetPasswordMessage').classList.remove('is-error');
+    supervisorPasswordResetUserId = null;
+    $('saveSupervisorResetPassword').disabled = false;
+  }
+
   $('supervisorUsersTable')?.addEventListener('click', async event => {
     if (activeUser?.role !== 'supervisor') return;
     const passwordButton = event.target.closest('[data-user-password]');
@@ -2060,17 +2095,10 @@
     const deleteButton = event.target.closest('[data-user-delete]');
     try {
       if (passwordButton) {
-        const userId = passwordButton.dataset.userPassword;
-        const userName = passwordButton.dataset.userName || 'المستخدم';
-        const password = window.prompt('اكتب كلمة المرور الجديدة للمستخدم: ' + userName);
-        if (password === null) return;
-        if (password.length < 3 || password.length > 128) { showToast('كلمة المرور يجب أن تكون من 3 إلى 128 حرفًا'); return; }
-        const confirmation = window.prompt('أعد كتابة كلمة المرور للتأكيد:');
-        if (confirmation === null) return;
-        if (password !== confirmation) { showToast('كلمتا المرور غير متطابقتين'); return; }
-        await window.desktopBridge.resetUserPassword({ userId, password });
-        await populateSupervisorUsers();
-        showToast('تم تغيير كلمة المرور، وسيُطلب من المستخدم تغييرها عند دخوله التالي');
+        openSupervisorPasswordResetModal(
+          passwordButton.dataset.userPassword,
+          passwordButton.dataset.userName || 'المستخدم'
+        );
         return;
       }
       if (toggleButton) {
@@ -2092,6 +2120,53 @@
       }
     } catch (error) {
       showToast(error.message || 'تعذر تنفيذ الإجراء');
+    }
+  });
+
+  $('closeSupervisorResetPassword').addEventListener('click', closeSupervisorPasswordResetModal);
+  $('cancelSupervisorResetPassword').addEventListener('click', closeSupervisorPasswordResetModal);
+  $('supervisorResetPasswordModal').addEventListener('click', event => {
+    if (event.target === $('supervisorResetPasswordModal')) closeSupervisorPasswordResetModal();
+  });
+
+  $('supervisorResetPasswordForm').addEventListener('submit', async event => {
+    event.preventDefault();
+    if (activeUser?.role !== 'supervisor' || !supervisorPasswordResetUserId) return;
+
+    const password = $('supervisorResetPassword').value;
+    const confirmation = $('supervisorResetPasswordConfirm').value;
+    const message = $('supervisorResetPasswordMessage');
+    const submit = $('saveSupervisorResetPassword');
+    message.classList.remove('is-error');
+
+    if (password.length < 3 || password.length > 128) {
+      message.textContent = 'كلمة المرور يجب أن تكون من 3 إلى 128 حرفًا.';
+      message.classList.add('is-error');
+      $('supervisorResetPassword').focus();
+      return;
+    }
+    if (password !== confirmation) {
+      message.textContent = 'تأكيد كلمة المرور غير مطابق.';
+      message.classList.add('is-error');
+      $('supervisorResetPasswordConfirm').focus();
+      return;
+    }
+
+    submit.disabled = true;
+    message.textContent = 'جارٍ حفظ كلمة المرور الجديدة...';
+    try {
+      await window.desktopBridge.resetUserPassword({
+        userId: supervisorPasswordResetUserId,
+        password
+      });
+      closeSupervisorPasswordResetModal();
+      await populateSupervisorUsers();
+      showToast('تم تغيير كلمة المرور، وسيُطلب من المستخدم تغييرها عند دخوله التالي');
+    } catch (error) {
+      message.textContent = error.message || 'تعذر تغيير كلمة المرور.';
+      message.classList.add('is-error');
+    } finally {
+      submit.disabled = false;
     }
   });
 

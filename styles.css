@@ -509,7 +509,7 @@ html.operator-dashboard-only .operator-logout-button[hidden]{
   .supervisor-add-form .capture-buttons .btn,.account-form-actions .btn{width:100%}
 }
 @media print{
-  #accountSettingsModal,#supervisorAddModal{display:none!important}
+  #accountSettingsModal,#supervisorAddModal,#supervisorResetPasswordModal{display:none!important}
 }
 
 
