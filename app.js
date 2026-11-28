@@ -1575,6 +1575,8 @@
     if (!exportRecords.length) { showToast('لا توجد عمليات لطباعتها'); return; }
     const rows = exportRecords.map(excelRowForRecord);
     const columns = Object.keys(rows[0] || {});
+    const totalNet = exportRecords.reduce((total, record) => total + (Number(record.netWeight) || 0), 0);
+    const averageNet = Math.round(totalNet / exportRecords.length);
     const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, char => ({
       '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
     })[char]);
@@ -1588,9 +1590,22 @@
     const printArea = document.createElement('section');
     printArea.id = 'weightReportPrintArea';
     printArea.innerHTML = `
-      <h2>${escapeHtml(reportTitle)}</h2>
-      <p>تاريخ الطباعة: ${escapeHtml(new Date().toLocaleString('ar-EG'))}</p>
+      <header class="weight-report-header">
+        <div class="weight-report-location">مدينة السادات – المدفن الصحي</div>
+        <h2>${escapeHtml(reportTitle)}</h2>
+        <p>تاريخ الطباعة: ${escapeHtml(new Date().toLocaleString('ar-EG'))}</p>
+      </header>
+      <div class="weight-report-summary">
+        <div><span>إجمالي العمليات</span><strong>${fmt(exportRecords.length)}</strong></div>
+        <div><span>إجمالي صافي الوزن</span><strong>${fmt(totalNet)} كجم</strong></div>
+        <div><span>متوسط الحمولة</span><strong>${fmt(averageNet)} كجم</strong></div>
+      </div>
+      <h3 class="weight-report-table-title">تفاصيل عمليات الوزن</h3>
       <table dir="rtl"><thead><tr>${tableHead}</tr></thead><tbody>${tableRows}</tbody></table>
+      <footer class="weight-report-footer">
+        <span>اعتماد المسؤول</span>
+        <span>التوقيع: __________________</span>
+      </footer>
     `;
     const printStyle = document.createElement('style');
     printStyle.id = 'weightReportPrintStyle';
@@ -1599,18 +1614,83 @@
       @media print {
         body.printing-weight-report > *:not(#weightReportPrintArea) { display:none !important; }
         body.printing-weight-report #weightReportPrintArea {
-          display:block !important; width:100% !important; padding:10mm !important;
-          margin:0 !important; background:#fff !important; color:#172744 !important;
-          direction:rtl !important; font-family:Arial,Tahoma,sans-serif !important;
+          display:block !important; box-sizing:border-box !important; width:100% !important;
+          padding:0 !important; margin:0 !important; background:#fff !important;
+          color:#172744 !important; direction:rtl !important;
+          font-family:Arial,Tahoma,sans-serif !important;
         }
-        #weightReportPrintArea h2 { text-align:center; margin:0 0 8px; font-size:20px; }
-        #weightReportPrintArea p { text-align:center; margin:0 0 16px; color:#687487; font-size:12px; }
-        #weightReportPrintArea table { direction:rtl !important; width:100% !important; max-width:100% !important; table-layout:fixed !important; border-collapse:collapse; font-size:11px; white-space:nowrap; }
-        #weightReportPrintArea th,#weightReportPrintArea td { direction:rtl; unicode-bidi:plaintext; border:1px solid #9aa5b5; padding:8px 7px; text-align:center; }
-        #weightReportPrintArea th { background:#edf0f5 !important; font-weight:bold; }
-        #weightReportPrintArea tr { break-inside:avoid; }
+        #weightReportPrintArea .weight-report-header {
+          text-align:center !important; padding:0 0 9px !important;
+          margin:0 0 12px !important; border-bottom:2px solid #c49a45 !important;
+        }
+        #weightReportPrintArea .weight-report-location {
+          color:#172744 !important; font-size:15px !important;
+          font-weight:800 !important; margin:0 0 7px !important;
+        }
+        #weightReportPrintArea h2 {
+          color:#172744 !important; text-align:center !important;
+          margin:0 0 5px !important; font-size:20px !important;
+        }
+        #weightReportPrintArea .weight-report-header p {
+          text-align:center !important; margin:0 !important;
+          color:#687487 !important; font-size:10px !important;
+        }
+        #weightReportPrintArea .weight-report-summary {
+          display:grid !important; grid-template-columns:repeat(3,minmax(0,1fr)) !important;
+          gap:6px !important; margin:0 0 14px !important;
+        }
+        #weightReportPrintArea .weight-report-summary > div {
+          box-sizing:border-box !important; min-width:0 !important;
+          padding:8px 4px !important; text-align:center !important;
+          background:#f1f3f6 !important; border:1px solid #d8dee8 !important;
+          border-top:2px solid #c49a45 !important; border-radius:5px !important;
+        }
+        #weightReportPrintArea .weight-report-summary span {
+          display:block !important; color:#687487 !important;
+          font-size:8px !important; margin-bottom:4px !important;
+        }
+        #weightReportPrintArea .weight-report-summary strong {
+          display:block !important; color:#172744 !important;
+          font-size:11px !important; line-height:1.35 !important;
+          overflow-wrap:anywhere !important;
+        }
+        #weightReportPrintArea .weight-report-table-title {
+          color:#172744 !important; font-size:11px !important;
+          margin:0 0 6px !important; font-weight:800 !important;
+        }
+        #weightReportPrintArea table {
+          direction:rtl !important; width:100% !important; max-width:100% !important;
+          table-layout:fixed !important; border-collapse:collapse !important;
+          font-size:8px !important; white-space:normal !important;
+        }
+        #weightReportPrintArea th,#weightReportPrintArea td {
+          box-sizing:border-box !important; direction:rtl !important;
+          unicode-bidi:plaintext !important; border:1px solid #aab4c2 !important;
+          padding:5px 3px !important; text-align:center !important;
+          line-height:1.4 !important; white-space:normal !important;
+          overflow-wrap:anywhere !important;
+        }
+        #weightReportPrintArea th {
+          background:#edf0f5 !important; color:#172744 !important;
+          font-weight:bold !important;
+        }
+        #weightReportPrintArea th:nth-child(1),#weightReportPrintArea td:nth-child(1) { width:13% !important; }
+        #weightReportPrintArea th:nth-child(2),#weightReportPrintArea td:nth-child(2) { width:13% !important; }
+        #weightReportPrintArea th:nth-child(3),#weightReportPrintArea td:nth-child(3) { width:13% !important; }
+        #weightReportPrintArea th:nth-child(4),#weightReportPrintArea td:nth-child(4) { width:13% !important; }
+        #weightReportPrintArea th:nth-child(5),#weightReportPrintArea td:nth-child(5) { width:14% !important; }
+        #weightReportPrintArea th:nth-child(6),#weightReportPrintArea td:nth-child(6) { width:19% !important; }
+        #weightReportPrintArea th:nth-child(7),#weightReportPrintArea td:nth-child(7) { width:15% !important; }
+        #weightReportPrintArea thead { display:table-header-group !important; }
+        #weightReportPrintArea tr { break-inside:avoid !important; page-break-inside:avoid !important; }
+        #weightReportPrintArea .weight-report-footer {
+          display:flex !important; justify-content:space-between !important;
+          gap:12px !important; margin-top:18px !important; padding-top:8px !important;
+          border-top:1px solid #d8dee8 !important; color:#536176 !important;
+          font-size:9px !important;
+        }
       }
-      @page { size:A4 landscape; margin:10mm; }
+      @page { size:A4 portrait; margin:9mm; }
     `;
     document.head.appendChild(printStyle);
     document.body.appendChild(printArea);
