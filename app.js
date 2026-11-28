@@ -2246,7 +2246,11 @@ th { background:#e9edf0 !important; font-weight:bold; } tr { break-inside:avoid;
       await enterAuthenticatedApp(user);
     } catch (error) {
       const loginError = String(error?.message || error || '');
-      const technicalLoginError = /api\\/login|unexpected end of json input|json\\.parse|syntaxerror/i.test(loginError);
+      const normalizedLoginError = loginError.toLowerCase();
+      const technicalLoginError = normalizedLoginError.includes('api/login')
+        || normalizedLoginError.includes('unexpected end of json input')
+        || normalizedLoginError.includes('json.parse')
+        || normalizedLoginError.includes('syntaxerror');
       const friendlyMessage = technicalLoginError
         ? 'اسم المستخدم أو كلمة المرور غير صحيحة، برجاء التأكد من البيانات والمحاولة مرة أخرى.'
         : (loginError || 'تعذر تسجيل الدخول. حاول مرة أخرى.');
