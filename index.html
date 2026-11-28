@@ -141,6 +141,10 @@
             <select id="supervisorReportFilter"><option value="all">كل المستخدمين</option></select>
           </label>
         </div>
+        <div class="panel supervisor-users-panel">
+          <div class="panel-heading"><div><h3>إدارة المستخدمين</h3><small>إضافة الحسابات وتغيير كلمات المرور وإيقافها أو حذفها</small></div><span class="record-count">حسابات التشغيل</span></div>
+          <div class="table-wrap"><table><thead><tr><th>الاسم</th><th>اسم الدخول</th><th>الحالة</th><th>كلمة المرور</th><th>الإجراءات</th></tr></thead><tbody id="supervisorUsersTable"><tr class="empty-row"><td colspan="5">جارٍ تحميل المستخدمين...</td></tr></tbody></table></div>
+        </div>
 <div class="stats-grid"><article class="stat-card"><div class="stat-icon teal">▤</div><div><span>إجمالي العمليات</span><strong id="reportCount">0</strong></div></article><article class="stat-card"><div class="stat-icon blue">▰</div><div><span>إجمالي صافي الوزن</span><strong id="reportNet">0 كجم</strong></div></article><article class="stat-card"><div class="stat-icon amber">◉</div><div><span>متوسط الحمولة</span><strong id="reportAverage">0 كجم</strong></div></article></div><div class="panel"><div class="panel-heading report-records-heading"><div><h3>قاعدة البيانات</h3><small></small></div><button class="btn btn-danger-ghost" type="button" data-delete-all-records>حذف جميع السجلات</button></div><div class="table-wrap"><table><thead><tr><th>رقم السيارة</th><th>رقم المقطورة</th><th>تاريخ العملية</th><th>صافي الوزن</th><th>الوزن الأول</th><th>الوزن الثاني</th><th>المحافظة</th><th id="reportUserHeader" hidden>المستخدم</th><th>نوع الحركة</th><th>السائق</th><th>العميل</th><th>اسم الشحنة</th><th>إجراء</th></tr></thead><tbody id="reportRecordsTable"><tr class="empty-row"><td colspan="13">لا توجد عمليات مسجلة</td></tr></tbody></table></div></div>
           <div class="panel customer-directory-panel">
             <div class="panel-heading"><div><h3>العملاء والشركات</h3><small>كل العملاء والشركات المسجلين في عمليات الوزن</small></div><span class="record-count" id="customerDirectoryCount">0 جهة</span></div>
