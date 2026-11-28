@@ -109,18 +109,7 @@
                 <label>تصنيف الجهة<select id="customerTypeInput"><option value="customer">عميل</option><option value="company">شركة</option></select></label>
                 <label>اسم السائق<input id="driverInput" placeholder="اسم السائق" /></label>
                 <label>اسم الشحنة<input id="shipmentInput" placeholder="اسم أو وصف الشحنة" /></label>
-                <label>المحافظة
-                  <select id="governorateInput">
-                    <option value="">اختر المحافظة</option>
-                    <option>القاهرة</option><option>الجيزة</option><option>الإسكندرية</option><option>الدقهلية</option>
-                    <option>البحيرة</option><option>الغربية</option><option>المنوفية</option><option>كفر الشيخ</option>
-                    <option>دمياط</option><option>الشرقية</option><option>القليوبية</option><option>بورسعيد</option>
-                    <option>الإسماعيلية</option><option>السويس</option><option>شمال سيناء</option><option>جنوب سيناء</option>
-                    <option>الفيوم</option><option>بني سويف</option><option>المنيا</option><option>أسيوط</option>
-                    <option>سوهاج</option><option>قنا</option><option>الأقصر</option><option>أسوان</option>
-                    <option>البحر الأحمر</option><option>الوادي الجديد</option><option>مطروح</option>
-                  </select>
-                </label>
+                <label>المحافظة<input id="governorateInput" placeholder="اكتب المحافظة" /></label>
                 <label class="movement-type-field">نوع الحركة
                   <select id="movementTypeInput">
                     <option value="وارد" selected>وارد</option>
@@ -152,7 +141,7 @@
             <select id="supervisorReportFilter"><option value="all">كل المستخدمين</option></select>
           </label>
         </div>
-<div class="stats-grid"><article class="stat-card"><div class="stat-icon teal">▤</div><div><span>إجمالي العمليات</span><strong id="reportCount">0</strong></div></article><article class="stat-card"><div class="stat-icon blue">▰</div><div><span>إجمالي صافي الوزن</span><strong id="reportNet">0 كجم</strong></div></article><article class="stat-card"><div class="stat-icon amber">◉</div><div><span>متوسط الحمولة</span><strong id="reportAverage">0 كجم</strong></div></article></div><div class="panel"><div class="panel-heading report-records-heading"><div><h3>السجلات المطابقة</h3><small></small></div><button class="btn btn-danger-ghost" type="button" data-delete-all-records>حذف جميع السجلات</button></div><div class="table-wrap"><table><thead><tr><th>رقم التذكرة</th><th>تاريخ العملية</th><th>صافي الوزن</th><th id="reportUserHeader" hidden>المستخدم</th><th>نوع الحركة</th><th>رقم السيارة</th><th>رقم المقطورة</th><th>السائق</th><th>العميل</th><th>اسم الشحنة</th><th>المحافظة</th><th>الوزن الأول</th><th>الوزن الثاني</th><th>إجراء</th></tr></thead><tbody id="reportRecordsTable"><tr class="empty-row"><td colspan="13">لا توجد عمليات مسجلة</td></tr></tbody></table></div></div>
+<div class="stats-grid"><article class="stat-card"><div class="stat-icon teal">▤</div><div><span>إجمالي العمليات</span><strong id="reportCount">0</strong></div></article><article class="stat-card"><div class="stat-icon blue">▰</div><div><span>إجمالي صافي الوزن</span><strong id="reportNet">0 كجم</strong></div></article><article class="stat-card"><div class="stat-icon amber">◉</div><div><span>متوسط الحمولة</span><strong id="reportAverage">0 كجم</strong></div></article></div><div class="panel"><div class="panel-heading report-records-heading"><div><h3>السجلات المطابقة</h3><small></small></div><button class="btn btn-danger-ghost" type="button" data-delete-all-records>حذف جميع السجلات</button></div><div class="table-wrap"><table><thead><tr><th>رقم السيارة</th><th>رقم المقطورة</th><th>تاريخ العملية</th><th>صافي الوزن</th><th id="reportUserHeader" hidden>المستخدم</th><th>نوع الحركة</th><th>السائق</th><th>العميل</th><th>اسم الشحنة</th><th>المحافظة</th><th>الوزن الأول</th><th>الوزن الثاني</th><th>إجراء</th></tr></thead><tbody id="reportRecordsTable"><tr class="empty-row"><td colspan="13">لا توجد عمليات مسجلة</td></tr></tbody></table></div></div>
           <div class="panel customer-directory-panel">
             <div class="panel-heading"><div><h3>العملاء والشركات</h3><small>كل العملاء والشركات المسجلين في عمليات الوزن</small></div><span class="record-count" id="customerDirectoryCount">0 جهة</span></div>
             <div class="customer-directory-toolbar">
@@ -394,18 +383,7 @@
             <label>تصنيف الجهة<select id="supervisorCustomerType"><option value="customer">عميل</option><option value="company">شركة</option></select></label>
             <label>اسم السائق<input id="supervisorDriver" placeholder="اسم السائق" /></label>
             <label>اسم الشحنة<input id="supervisorShipment" placeholder="اسم أو وصف الشحنة" /></label>
-            <label>المحافظة
-              <select id="supervisorGovernorate">
-                <option value="">اختر المحافظة</option>
-                <option>القاهرة</option><option>الجيزة</option><option>الإسكندرية</option><option>الدقهلية</option>
-                <option>البحيرة</option><option>الغربية</option><option>المنوفية</option><option>كفر الشيخ</option>
-                <option>دمياط</option><option>الشرقية</option><option>القليوبية</option><option>بورسعيد</option>
-                <option>الإسماعيلية</option><option>السويس</option><option>شمال سيناء</option><option>جنوب سيناء</option>
-                <option>الفيوم</option><option>بني سويف</option><option>المنيا</option><option>أسيوط</option>
-                <option>سوهاج</option><option>قنا</option><option>الأقصر</option><option>أسوان</option>
-                <option>البحر الأحمر</option><option>الوادي الجديد</option><option>مطروح</option>
-              </select>
-            </label>
+            <label>المحافظة<input id="supervisorGovernorate" placeholder="اكتب المحافظة" /></label>
             <label class="movement-type-field">نوع الحركة
               <select id="supervisorMovementType"><option value="وارد" selected>وارد</option><option value="صادر">صادر</option></select>
             </label>
