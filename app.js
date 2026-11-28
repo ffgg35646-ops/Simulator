@@ -873,36 +873,41 @@
   }
 
   function renderCustomerDirectory() {
-    const query = ($('customerDirectorySearch')?.value || '').trim().toLocaleLowerCase('ar');
-    const type = $('customerDirectoryType')?.value || 'all';
-    const groups = new Map();
-    records.forEach(record => {
-      const name = String(record.customer || '').trim();
-      if (!name || name === '—') return;
-      const customerType = record.customerType === 'company' ? 'company' : 'customer';
-      if (type !== 'all' && customerType !== type) return;
-      const key = customerType + '|' + name.toLocaleLowerCase('ar');
-      const group = groups.get(key) || { name, customerType, count: 0, latest: record, searchText: '' };
-      group.count += 1;
-      if (new Date(record.createdAt || 0).getTime() >= new Date(group.latest.createdAt || 0).getTime()) group.latest = record;
-      group.searchText += ' ' + [record.customer, record.plate, record.trailer, record.driver, record.shipment, record.governorate, record.id, record.movementType].join(' ');
-      groups.set(key, group);
-    });
-    const results = [...groups.values()].filter(group =>
-      !query || (group.name + ' ' + group.searchText).toLocaleLowerCase('ar').includes(query)
-    ).sort((a,b) => a.name.localeCompare(b.name, 'ar'));
-    $('customerDirectoryCount').textContent = fmt(results.length) + ' جهة';
-    $('customerDirectoryTable').innerHTML = results.length ? results.map(group => {
-      const latest = group.latest;
-      return '<tr><td><strong>'+esc(group.name)+'</strong></td><td>'+ (group.customerType === 'company' ? 'شركة' : 'عميل') +'</td><td>'+fmt(group.count)+'</td><td>'+esc(latest.plate || '—')+'</td><td>'+esc(latest.driver || '—')+'</td><td>'+esc(latest.shipment || '—')+'</td><td>'+fmt(latest.netWeight)+' كجم</td><td>'+stamp(new Date(latest.createdAt))+'</td></tr>';
-    }).join('') : '<tr class="empty-row"><td colspan="8">'+(records.some(record => record.customer && record.customer !== '—') ? 'لا توجد نتائج مطابقة للبحث' : 'لا توجد بيانات عملاء أو شركات مسجلة بعد')+'</td></tr>';
+    const renderDirectoryType = (type, searchId, countId, tableId, label) => {
+      const query = ($(searchId)?.value || '').trim().toLocaleLowerCase('ar');
+      const groups = new Map();
+      records.forEach(record => {
+        const name = String(record.customer || '').trim();
+        if (!name || name === '—') return;
+        const customerType = record.customerType === 'company' ? 'company' : 'customer';
+        if (customerType !== type) return;
+        const key = customerType + '|' + name.toLocaleLowerCase('ar');
+        const group = groups.get(key) || { name, count: 0, latest: record, searchText: '' };
+        group.count += 1;
+        if (new Date(record.createdAt || 0).getTime() >= new Date(group.latest.createdAt || 0).getTime()) group.latest = record;
+        group.searchText += ' ' + [record.customer, record.plate, record.trailer, record.driver, record.shipment, record.governorate, record.id, record.movementType].join(' ');
+        groups.set(key, group);
+      });
+      const results = [...groups.values()].filter(group =>
+        !query || (group.name + ' ' + group.searchText).toLocaleLowerCase('ar').includes(query)
+      ).sort((a,b) => a.name.localeCompare(b.name, 'ar'));
+      const count = $(countId);
+      const table = $(tableId);
+      if (count) count.textContent = fmt(results.length) + ' ' + label;
+      if (table) table.innerHTML = results.length ? results.map(group => {
+        const latest = group.latest;
+        return '<tr><td><strong>'+esc(group.name)+'</strong></td><td>'+fmt(group.count)+'</td><td>'+esc(latest.plate || '—')+'</td><td>'+esc(latest.driver || '—')+'</td><td>'+esc(latest.shipment || '—')+'</td><td>'+fmt(latest.netWeight)+' كجم</td><td>'+stamp(new Date(latest.createdAt))+'</td></tr>';
+      }).join('') : '<tr class="empty-row"><td colspan="7">'+(records.some(record => record.customer && record.customer !== '—' && (type === 'company' ? record.customerType === 'company' : record.customerType !== 'company')) ? 'لا توجد نتائج مطابقة للبحث' : 'لا توجد بيانات '+(type === 'company' ? 'شركات' : 'عملاء')+' مسجلة بعد')+'</td></tr>';
+    };
+    renderDirectoryType('customer', 'customersDirectorySearch', 'customersDirectoryCount', 'customersDirectoryTable', 'عميل');
+    renderDirectoryType('company', 'companiesDirectorySearch', 'companiesDirectoryCount', 'companiesDirectoryTable', 'شركة');
   }
   function switchView(name) {
     // Operator accounts are intentionally limited to the single operating screen.
     if (activeUser?.role === 'operator' && name !== 'dashboard') name = 'dashboard';
     document.querySelectorAll('.view').forEach(v=>v.classList.toggle('active',v.id==='view-'+name));
     document.querySelectorAll('.nav-link').forEach(v=>v.classList.toggle('active',v.dataset.view===name));
-    const titles={dashboard:'لوحة التشغيل',weighings:'سجل عمليات الوزن',vehicles:'السيارات والعملاء',reports:'التقارير والإحصائيات',devices:'الأجهزة والاتصال'};
+    const titles={dashboard:'لوحة التشغيل',weighings:'سجل عمليات الوزن',vehicles:'السيارات والعملاء',reports:'التقارير والإحصائيات','user-management':'إدارة المستخدمين',customers:'العملاء',companies:'الشركات',devices:'الأجهزة والاتصال'};
     $('pageTitle').textContent=titles[name]||'لوحة التشغيل';
     $('sidebar').classList.remove('open');
     if(name==='weighings')renderRecords();
@@ -1655,8 +1660,8 @@ th { background:#e9edf0 !important; font-weight:bold; } tr { break-inside:avoid;
     if (event.target === $('supervisorAddModal')) closeSupervisorAddModal();
   });
   $('recordSearch').addEventListener('input',renderRecords);
-  $('customerDirectorySearch').addEventListener('input',renderCustomerDirectory);
-  $('customerDirectoryType').addEventListener('change',renderCustomerDirectory);
+  $('customersDirectorySearch').addEventListener('input',renderCustomerDirectory);
+  $('companiesDirectorySearch').addEventListener('input',renderCustomerDirectory);
   $('clearRecordSearch').addEventListener('click',()=>{ $('recordSearch').value=''; renderRecords(); });
   $('exportRecords').addEventListener('click',exportCSV);
   $('exportExcel').addEventListener('click',exportExcel);
@@ -2162,11 +2167,16 @@ th { background:#e9edf0 !important; font-weight:bold; } tr { break-inside:avoid;
     const isSupervisor = activeUser?.role === 'supervisor';
     const isOperator = activeUser?.role === 'operator';
     document.documentElement.classList.toggle('operator-dashboard-only', isOperator);
+    const supervisorViews = ['reports', 'user-management', 'customers', 'companies'];
     document.querySelectorAll('.nav-link').forEach(button => {
-      button.hidden = isSupervisor && button.dataset.view !== 'reports';
+      button.hidden = isSupervisor
+        ? !supervisorViews.includes(button.dataset.view)
+        : (isOperator && button.dataset.view !== 'dashboard');
     });
     document.querySelectorAll('.view').forEach(view => {
-      view.hidden = isSupervisor && view.id !== 'view-reports';
+      view.hidden = isSupervisor
+        ? !supervisorViews.includes(view.id.replace('view-', ''))
+        : (isOperator && view.id !== 'view-dashboard');
     });
     $('supervisorReportControls').hidden = !isSupervisor;
     $('supervisorAddRecord').hidden = !isSupervisor;
