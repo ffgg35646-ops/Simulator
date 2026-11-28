@@ -336,12 +336,24 @@ function registerAuthHandlers() {
     const password = String(input.password || '');
     if (displayName.length < 2 || displayName.length > 80) throw new Error('اكتب اسمًا صحيحًا من حرفين إلى 80 حرفًا.');
     if (password && password.length < 3) throw new Error('كلمة المرور الجديدة يجب ألا تقل عن 3 أحرف.');
+
+    // The editable account name is also the login username. Keep the email
+    // untouched as an additional sign-in option, and reject another account's identifier.
+    const conflictingAccount = db.prepare(`
+      SELECT id FROM app_users
+      WHERE id <> ?
+        AND (username = ? COLLATE NOCASE OR email = ? COLLATE NOCASE)
+      LIMIT 1
+    `).get(authSession.id, displayName, displayName);
+    if (conflictingAccount) throw new Error('اسم الدخول الجديد مستخدم بالفعل. اختر اسمًا آخر.');
+
     if (password) {
       const salt = crypto.randomBytes(16).toString('hex');
-      db.prepare('UPDATE app_users SET display_name=?, password_salt=?, password_hash=?, must_change_password=0 WHERE id=?')
-        .run(displayName, salt, passwordHash(password, salt), authSession.id);
+      db.prepare('UPDATE app_users SET username=?, display_name=?, password_salt=?, password_hash=?, must_change_password=0 WHERE id=?')
+        .run(displayName, displayName, salt, passwordHash(password, salt), authSession.id);
     } else {
-      db.prepare('UPDATE app_users SET display_name=? WHERE id=?').run(displayName, authSession.id);
+      db.prepare('UPDATE app_users SET username=?, display_name=? WHERE id=?')
+        .run(displayName, displayName, authSession.id);
     }
     const row = db.prepare('SELECT * FROM app_users WHERE id=?').get(authSession.id);
     authSession = publicUser(row);
