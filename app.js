@@ -1492,6 +1492,37 @@
     return ownerFilter === 'all' ? records.slice() : records.filter(record => record.createdByUserId === ownerFilter);
   }
 
+  function printExcelReport() {
+    const exportRecords = getReportExportRecords();
+    if (!exportRecords.length) { showToast('لا توجد عمليات لطباعتها'); return; }
+    const rows = exportRecords.slice().reverse().map(excelRowForRecord);
+    const columns = Object.keys(rows[0] || {});
+    const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, char => ({
+      '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
+    })[char]);
+    const printWindow = window.open('', '_blank');
+    if (!printWindow) { showToast('اسمح بفتح النوافذ المنبثقة لإتمام الطباعة'); return; }
+    const tableHead = columns.map(column => '<th>' + escapeHtml(column) + '</th>').join('');
+    const tableRows = rows.map(row => '<tr>' + columns.map(column => '<td>' + escapeHtml(row[column]) + '</td>').join('') + '</tr>').join('');
+    printWindow.document.open();
+    printWindow.document.write(`<!doctype html>
+<html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>تقرير Excel - برنامج الميزان</title>
+<style>
+@page { size: landscape; margin: 10mm; }
+body { font-family: Arial,Tahoma,sans-serif; color:#111; padding:12px; }
+h2 { text-align:center; margin:0 0 8px; } p { text-align:center; margin:0 0 16px; color:#555; font-size:12px; }
+table { width:100%; border-collapse:collapse; font-size:10px; }
+th,td { border:1px solid #777; padding:6px 5px; text-align:center; }
+th { background:#e9edf0 !important; font-weight:bold; } tr { break-inside:avoid; }
+@media print { body { padding:0; } }
+</style></head><body>
+<h2>تقرير سجل الوزن</h2><p>تاريخ الطباعة: ${escapeHtml(new Date().toLocaleString('ar-EG'))}</p>
+<table><thead><tr>${tableHead}</tr></thead><tbody>${tableRows}</tbody></table>
+<script>window.addEventListener('load', () => { window.focus(); window.print(); });<\/script>
+</body></html>`);
+    printWindow.document.close();
+  }
+
   async function exportExcel() {
     const exportRecords = getReportExportRecords();
     if (!exportRecords.length) { showToast('لا توجد عمليات لتصديرها'); return; }
@@ -1573,6 +1604,7 @@
   $('clearRecordSearch').addEventListener('click',()=>{ $('recordSearch').value=''; renderRecords(); });
   $('exportRecords').addEventListener('click',exportCSV);
   $('exportExcel').addEventListener('click',exportExcel);
+  $('printExcel').addEventListener('click', printExcelReport);
   function setExcelSyncStatus(status) {
     const target = $('excelSyncStatus');
     if (!target) return;
