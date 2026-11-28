@@ -1212,3 +1212,27 @@ html.operator-dashboard-only .weight-mode-label select:focus {
   background:#203A63 !important;
   border-color:#E2C36D !important;
 }
+
+
+/* Simplified Windows login branding: only the product name, in the same gold as the login button. */
+.auth-brand{
+  justify-content:center;
+}
+.auth-brand .auth-brand-name{
+  display:block;
+  margin:0;
+  color:#BD8E35;
+  font-size:25px;
+  line-height:1.4;
+  font-weight:900;
+  letter-spacing:0;
+}
+.auth-card h1{
+  margin-bottom:16px;
+}
+.auth-form label{
+  gap:0;
+}
+.auth-message{
+  min-height:0;
+}
