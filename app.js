@@ -1948,6 +1948,9 @@
 
   function closeSupervisorUserModal() {
     $('supervisorUserModal').classList.remove('open');
+    $('supervisorUserForm').reset();
+    $('supervisorUserMessage').textContent = '';
+    $('supervisorUserMessage').classList.remove('is-error');
   }
 
   $('supervisorAddUser').addEventListener('click', openSupervisorUserModal);
