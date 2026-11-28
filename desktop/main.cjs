@@ -43,12 +43,16 @@ function openDatabase() {
       password_salt TEXT NOT NULL,
       password_hash TEXT NOT NULL,
       must_change_password INTEGER NOT NULL DEFAULT 0,
+      is_active INTEGER NOT NULL DEFAULT 1,
       created_at TEXT NOT NULL DEFAULT CURRENT_TIMESTAMP
     );
   `);
   const userColumns = db.prepare('PRAGMA table_info(app_users)').all();
   if (!userColumns.some(column => column.name === 'must_change_password')) {
     db.exec('ALTER TABLE app_users ADD COLUMN must_change_password INTEGER NOT NULL DEFAULT 0');
+  }
+  if (!userColumns.some(column => column.name === 'is_active')) {
+    db.exec('ALTER TABLE app_users ADD COLUMN is_active INTEGER NOT NULL DEFAULT 1');
   }
   const get = db.prepare('SELECT value FROM app_kv WHERE key = ?');
   const put = db.prepare(`INSERT INTO app_kv(key,value,updated_at) VALUES(?,?,CURRENT_TIMESTAMP)
@@ -127,7 +131,8 @@ function publicUser(row) {
     email: row.email || '',
     displayName: row.display_name,
     role: row.role,
-    mustChangePassword: Boolean(row.must_change_password)
+    mustChangePassword: Boolean(row.must_change_password),
+    isActive: row.is_active === undefined ? true : Boolean(row.is_active)
   };
 }
 
@@ -307,6 +312,7 @@ function registerAuthHandlers() {
       loginFailures.set(attemptKey, next);
       throw new Error('بياناتك غلط. راجع اسم المستخدم وكلمة المرور.');
     }
+    if (account.is_active === 0) throw new Error('هذا الحساب موقوف. راجع المشرف.');
     loginFailures.delete(attemptKey);
     authSession = publicUser(account);
     return authSession;
@@ -344,8 +350,8 @@ function registerAuthHandlers() {
 
   ipcMain.handle('auth:users', () => {
     if (!authSession || authSession.role !== 'supervisor') throw new Error('هذه القائمة متاحة للمشرف فقط.');
-    return db.prepare("SELECT id,username,display_name FROM app_users WHERE role='operator' ORDER BY created_at,id")
-      .all().map(row => ({ id: row.id, username: row.username, displayName: row.display_name }));
+    return db.prepare("SELECT id,username,display_name,is_active,must_change_password FROM app_users WHERE role='operator' ORDER BY created_at,id")
+      .all().map(row => ({ id: row.id, username: row.username, displayName: row.display_name, isActive: Boolean(row.is_active), mustChangePassword: Boolean(row.must_change_password) }));
   });
 
   ipcMain.handle('auth:add-user', (_event, input = {}) => {
@@ -372,11 +378,43 @@ function registerAuthHandlers() {
     const id = crypto.randomUUID();
     const salt = crypto.randomBytes(16).toString('hex');
     db.prepare(`INSERT INTO app_users(id,username,email,display_name,role,password_salt,password_hash,must_change_password)
-      VALUES(?,?,NULL,?,'operator',?,?,0)`)
+      VALUES(?,?,NULL,?,'operator',?,?,1)`)
       .run(id, username, displayName, salt, passwordHash(password, salt));
 
     const created = db.prepare('SELECT * FROM app_users WHERE id=?').get(id);
     return publicUser(created);
+  });
+
+
+  ipcMain.handle('auth:reset-user-password', (_event, input = {}) => {
+    if (!authSession || authSession.role !== 'supervisor') throw new Error('تغيير كلمات مرور المستخدمين متاح للمشرف فقط.');
+    const userId = String(input.userId || '');
+    const password = String(input.password || '');
+    if (password.length < 3 || password.length > 128) throw new Error('كلمة المرور يجب أن تكون من 3 إلى 128 حرفًا.');
+    const target = db.prepare("SELECT id FROM app_users WHERE id=? AND role='operator'").get(userId);
+    if (!target) throw new Error('المستخدم غير موجود.');
+    const salt = crypto.randomBytes(16).toString('hex');
+    db.prepare('UPDATE app_users SET password_salt=?, password_hash=?, must_change_password=1 WHERE id=?')
+      .run(salt, passwordHash(password, salt), userId);
+    return { success: true, mustChangePassword: true };
+  });
+
+  ipcMain.handle('auth:set-user-active', (_event, input = {}) => {
+    if (!authSession || authSession.role !== 'supervisor') throw new Error('إدارة حالة المستخدمين متاحة للمشرف فقط.');
+    const userId = String(input.userId || '');
+    const active = Boolean(input.active);
+    const result = db.prepare("UPDATE app_users SET is_active=? WHERE id=? AND role='operator'").run(active ? 1 : 0, userId);
+    if (!result.changes) throw new Error('المستخدم غير موجود.');
+    return { success: true, isActive: active };
+  });
+
+  ipcMain.handle('auth:delete-user', (_event, input = {}) => {
+    if (!authSession || authSession.role !== 'supervisor') throw new Error('حذف المستخدمين متاح للمشرف فقط.');
+    const userId = String(input.userId || '');
+    if (!userId || userId === authSession.id) throw new Error('لا يمكن حذف هذا الحساب.');
+    const result = db.prepare("DELETE FROM app_users WHERE id=? AND role='operator'").run(userId);
+    if (!result.changes) throw new Error('المستخدم غير موجود.');
+    return { success: true };
   });
 
   ipcMain.handle('tickets:add-supervisor-record', (_event, input = {}) => {
