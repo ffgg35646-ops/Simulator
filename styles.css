@@ -1064,3 +1064,36 @@ html.operator-dashboard-only .manual-tag{
   background:#f5ecd7!important;
   color:#8a6726!important;
 }
+
+
+/* Operator inputs: increase control size by 50% from the previous 108px. */
+html.operator-dashboard-only #firstWeightInput,
+html.operator-dashboard-only #secondWeightInput,
+html.operator-dashboard-only #ticketDetailsFields input,
+html.operator-dashboard-only #ticketDetailsFields select,
+html.operator-dashboard-only .weight-mode-label select {
+  height:162px !important;
+  min-height:162px !important;
+  padding:30px 24px !important;
+  font-size:27px !important;
+  line-height:1.5 !important;
+}
+html.operator-dashboard-only #ticketDetailsFields.form-grid{
+  max-width:1160px !important;
+  gap:20px 24px !important;
+}
+html.operator-dashboard-only .manual-weight-row.weight-input-pair{
+  gap:22px !important;
+}
+@media(max-width:560px){
+  html.operator-dashboard-only #firstWeightInput,
+  html.operator-dashboard-only #secondWeightInput,
+  html.operator-dashboard-only #ticketDetailsFields input,
+  html.operator-dashboard-only #ticketDetailsFields select,
+  html.operator-dashboard-only .weight-mode-label select{
+    height:162px !important;
+    min-height:162px !important;
+    padding:26px 16px !important;
+    font-size:23px !important;
+  }
+}
