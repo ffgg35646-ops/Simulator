@@ -22,7 +22,7 @@
             <input id="authIdentifier" autocomplete="username" placeholder="scale01 أو البريد الإلكتروني للمشرف" required />
           </label>
           <label>كلمة المرور
-            <input id="authPassword" type="password" autocomplete="current-password" placeholder="كلمة المرور" required />
+            <div class="password-field"><input id="authPassword" type="password" autocomplete="current-password" placeholder="كلمة المرور" required /><button class="password-visibility" type="button" data-toggle-password="authPassword" aria-label="إظهار كلمة المرور" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg></button></div>
           </label>
           <button class="btn btn-primary btn-large" type="submit" id="authLoginSubmit">دخول إلى البرنامج</button>
           <p class="auth-message" id="authLoginMessage" role="status"></p>
@@ -34,10 +34,10 @@
         <p class="auth-description">لأمان الحساب، غيّر كلمة المرور المؤقتة قبل الدخول إلى لوحة التشغيل. كلمة المرور الجديدة يجب ألا تقل عن 3 أحرف.</p>
         <form id="authChangeForm" class="auth-form">
           <label>كلمة المرور الجديدة
-            <input id="authNewPassword" type="password" autocomplete="new-password" minlength="3" required />
+            <div class="password-field"><input id="authNewPassword" type="password" autocomplete="new-password" minlength="3" required /><button class="password-visibility" type="button" data-toggle-password="authNewPassword" aria-label="إظهار كلمة المرور" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg></button></div>
           </label>
           <label>تأكيد كلمة المرور الجديدة
-            <input id="authNewPasswordConfirm" type="password" autocomplete="new-password" minlength="3" required />
+            <div class="password-field"><input id="authNewPasswordConfirm" type="password" autocomplete="new-password" minlength="3" required /><button class="password-visibility" type="button" data-toggle-password="authNewPasswordConfirm" aria-label="إظهار تأكيد كلمة المرور" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg></button></div>
           </label>
           <button class="btn btn-primary btn-large" type="submit" id="authChangeSubmit">حفظ كلمة المرور والدخول</button>
           <p class="auth-message" id="authChangeMessage" role="status"></p>
@@ -353,10 +353,10 @@
           <input id="accountDisplayName" type="text" maxlength="80" autocomplete="name" required />
         </label>
         <label>كلمة المرور الجديدة <small>اتركها فارغة إذا كنت لا تريد تغييرها</small>
-          <input id="accountNewPassword" type="password" minlength="3" autocomplete="new-password" placeholder="3 أحرف على الأقل" />
+          <div class="password-field"><input id="accountNewPassword" type="password" minlength="3" autocomplete="new-password" placeholder="3 أحرف على الأقل" /><button class="password-visibility" type="button" data-toggle-password="accountNewPassword" aria-label="إظهار كلمة المرور" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg></button></div>
         </label>
         <label>تأكيد كلمة المرور الجديدة
-          <input id="accountNewPasswordConfirm" type="password" minlength="3" autocomplete="new-password" placeholder="أعد كتابة كلمة المرور الجديدة" />
+          <div class="password-field"><input id="accountNewPasswordConfirm" type="password" minlength="3" autocomplete="new-password" placeholder="أعد كتابة كلمة المرور الجديدة" /><button class="password-visibility" type="button" data-toggle-password="accountNewPasswordConfirm" aria-label="إظهار تأكيد كلمة المرور" aria-pressed="false"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M2 12s3.6-7 10-7 10 7 10 7-3.6 7-10 7S2 12 2 12Z"/><circle cx="12" cy="12" r="3"/></svg></button></div>
         </label>
         <p class="account-form-message" id="accountSettingsMessage" role="status"></p>
         <div class="account-form-actions"><button class="btn btn-primary" id="saveAccountSettings" type="submit">حفظ التغييرات</button><button class="btn btn-outline" id="cancelAccountSettings" type="button">إلغاء</button></div>
