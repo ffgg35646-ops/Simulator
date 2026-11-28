@@ -736,9 +736,6 @@
 
   function rowMarkup(r, detailed = false) {
     const movement = esc(r.movementType || '—');
-    const ownerCell = activeUser?.role === 'supervisor'
-      ? '<td>'+esc(r.createdByUserName || 'غير محدد')+'</td>'
-      : '';
     const editAction = activeUser?.role === 'supervisor'
       ? '<button class="table-action" data-edit-record="'+esc(r.id)+'">تعديل</button>'
       : '';
@@ -746,13 +743,14 @@
       ? ''
       : '<button class="table-action delete-row-action" data-delete-record="'+esc(r.id)+'">حذف</button>';
     const cells = detailed
-      ? '<td><strong>'+esc(r.id)+'</strong></td>' + ownerCell + '<td>'+movement+'</td><td>'+esc(r.plate)+'</td><td>'+esc(r.trailer || '—')+'</td>' +
-        '<td>'+esc(r.driver)+'</td><td>'+esc(r.customer)+'</td><td>'+esc(r.shipment || '—')+'</td><td>'+esc(r.governorate || '—')+'</td>' +
-        '<td>'+fmt(r.firstWeight)+'</td><td>'+fmt(r.secondWeight)+'</td><td><strong class="net-cell">'+fmt(r.netWeight)+'</strong></td><td>'+stamp(new Date(r.createdAt))+'</td>' +
+      ? '<td>'+esc(r.plate || '—')+'</td><td>'+esc(r.trailer || '—')+'</td>' +
+        '<td>'+fmt(r.firstWeight)+'</td><td>'+fmt(r.secondWeight)+'</td>' +
+        '<td><strong class="net-cell">'+fmt(r.netWeight)+'</strong></td><td>'+stamp(new Date(r.createdAt))+'</td><td>'+movement+'</td>' +
         '<td><div class="table-actions">'+editAction+'<button class="table-action" data-ticket="'+esc(r.id)+'">التذكرة</button><button class="table-action" data-export-ticket="'+esc(r.id)+'">تصدير Excel</button>'+deleteAction+'</div></td>'
-      : '<td><strong>'+esc(r.id)+'</strong></td><td>'+movement+'</td><td>'+esc(r.plate)+'</td><td>'+esc(r.trailer || '—')+'</td>' +
-        '<td>'+esc(r.customer)+'</td><td>'+esc(r.driver)+'</td><td>'+esc(r.shipment || '—')+'</td><td><strong class="net-cell">'+fmt(r.netWeight)+'</strong></td><td>'+stamp(new Date(r.createdAt))+'</td>' +
-        '<td><div class="table-actions">'+editAction+'<button class="table-action" data-export-ticket="'+esc(r.id)+'">تصدير ملف Excel</button></div></td>';
+      : '<td>'+movement+'</td><td>'+esc(r.plate || '—')+'</td><td>'+esc(r.trailer || '—')+'</td>' +
+        '<td>'+esc(r.customer || '—')+'</td><td>'+esc(r.driver || '—')+'</td><td>'+esc(r.shipment || '—')+'</td>' +
+        '<td><strong class="net-cell">'+fmt(r.netWeight)+'</strong></td><td>'+stamp(new Date(r.createdAt))+'</td>' +
+        '<td><div class="table-actions"><button class="table-action" data-export-ticket="'+esc(r.id)+'">تصدير ملف Excel</button></div></td>';
     return '<tr>'+cells+'</tr>';
   }
   function searchRecords(query, sourceRecords = records) {
@@ -810,7 +808,7 @@
     $('lastWeighing').textContent = records.length ? stamp(new Date(records[0].createdAt)) : '—';
     updateConnectionCard();
     $('sidebarDeviceStatus').textContent = serialPort ? (serialPort.auto ? 'تم التعرف على الميزان تلقائيًا' : 'الميزان متصل') : 'بانتظار توصيل الميزان';
-    $('recentTable').innerHTML = records.length ? records.slice(0,5).map(r=>rowMarkup(r)).join('') : '<tr class="empty-row"><td colspan="10">لا توجد عمليات مسجلة حتى الآن</td></tr>';
+    $('recentTable').innerHTML = records.length ? records.slice(0,5).map(r=>rowMarkup(r)).join('') : '<tr class="empty-row"><td colspan="9">لا توجد عمليات مسجلة حتى الآن</td></tr>';
     renderRecords();
     renderVehicles();
     renderReports();
@@ -818,7 +816,7 @@
   }
   function renderRecords() {
     const filtered = searchRecords($('recordSearch')?.value || '');
-    $('recordsTable').innerHTML = filtered.length ? filtered.map(r=>rowMarkup(r,true)).join('') : '<tr class="empty-row"><td colspan="9">'+(records.length ? 'لا توجد سجلات مطابقة للبحث' : 'لا توجد عمليات مسجلة')+'</td></tr>';
+    $('recordsTable').innerHTML = filtered.length ? filtered.map(r=>rowMarkup(r,true)).join('') : '<tr class="empty-row"><td colspan="8">'+(records.length ? 'لا توجد سجلات مطابقة للبحث' : 'لا توجد عمليات مسجلة')+'</td></tr>';
     $('recordCount').textContent = fmt(filtered.length) + ' من أصل ' + fmt(records.length) + ' عملية';
   }
   function renderVehicles() {
@@ -843,33 +841,18 @@
     $('reportCount').textContent = fmt(filtered.length);
     $('reportNet').textContent = fmt(total)+' كجم';
     $('reportAverage').textContent = fmt(filtered.length ? Math.round(total/filtered.length) : 0)+' كجم';
-    const emptyColumns = activeUser?.role === 'supervisor' ? 14 : 13;
-    $('reportRecordsTable').innerHTML = filtered.length ? filtered.map(r=>reportRowMarkup(r)).join('') : '<tr class="empty-row"><td colspan="'+emptyColumns+'">'+(reportSource.length ? 'لا توجد نتائج مطابقة للبحث' : 'لا توجد عمليات مسجلة')+'</td></tr>';
+    $('reportRecordsTable').innerHTML = filtered.length ? filtered.map(r=>reportRowMarkup(r)).join('') : '<tr class="empty-row"><td colspan="7">'+(reportSource.length ? 'لا توجد نتائج مطابقة للبحث' : 'لا توجد عمليات مسجلة')+'</td></tr>';
     renderCustomerDirectory();
   }
   function reportRowMarkup(r) {
-    const ownerCell = activeUser?.role === 'supervisor'
-      ? '<td>'+esc(r.createdByUserName || 'غير محدد')+'</td>'
-      : '';
-    const editAction = activeUser?.role === 'supervisor'
-      ? '<button class="table-action" data-edit-record="'+esc(r.id)+'">تعديل</button>'
-      : '';
-    const deleteAction = activeUser?.role === 'supervisor'
-      ? ''
-      : '<button class="table-action delete-row-action" data-delete-record="'+esc(r.id)+'">حذف</button>';
     const operationDate = r.createdAt ? stamp(new Date(r.createdAt)) : '—';
     return '<tr><td>'+esc(r.plate || '—')+'</td>' +
       '<td>'+esc(r.trailer || '—')+'</td>' +
-      '<td class="report-date-cell">'+esc(operationDate)+'</td>' +
+      '<td>'+fmt(r.firstWeight)+'</td>' +
+      '<td>'+fmt(r.secondWeight)+'</td>' +
       '<td><strong class="net-cell">'+fmt(r.netWeight)+' كجم</strong></td>' +
-      '<td>'+fmt(r.firstWeight)+'</td><td>'+fmt(r.secondWeight)+'</td>' +
-      '<td>'+esc(r.governorate || '—')+'</td>' +
-      ownerCell +
-      '<td>'+esc(r.movementType || '—')+'</td><td>'+esc(r.driver || '—')+'</td>' +
-      '<td>'+esc(r.customer || '—')+'</td><td>'+esc(r.shipment || '—')+'</td>' +
-      '<td><div class="table-actions">'+editAction+
-      '<button class="table-action" data-ticket="'+esc(r.id)+'">التذكرة</button>'+
-      '<button class="table-action" data-export-ticket="'+esc(r.id)+'">تصدير Excel</button>'+deleteAction+'</div></td></tr>';
+      '<td class="report-date-cell">'+esc(operationDate)+'</td>' +
+      '<td>'+esc(r.movementType || '—')+'</td></tr>';
   }
 
   function renderCustomerDirectory() {
@@ -1303,21 +1286,14 @@
     showToast('تم قطع الاتصال بالميزان');
   }
   function excelRowForRecord(r) {
-    const original1 = Object.prototype.hasOwnProperty.call(r, 'firstOriginalWeight') ? r.firstOriginalWeight : r.firstWeight;
-    const original2 = Object.prototype.hasOwnProperty.call(r, 'secondOriginalWeight') ? r.secondOriginalWeight : r.secondWeight;
     return {
-      'رقم التذكرة': r.id, 'نوع الحركة': r.movementType || '—', 'رقم السيارة': r.plate, 'رقم المقطورة': r.trailer || '—',
-      'السائق': r.driver, 'العميل': r.customer, 'اسم الشحنة': r.shipment || '—', 'المحافظة': r.governorate || '—',
-      'قراءة الأولى الأصلية (كجم)': original1 == null ? 'إدخال يدوي' : original1,
-      'الوزن الأول المعتمد (كجم)': r.firstWeight,
-      'فرق تعديل الأولى (كجم)': original1 == null ? '' : Number((r.firstWeight - original1).toFixed(2)),
-      'قراءة الثانية الأصلية (كجم)': original2 == null ? 'إدخال يدوي' : original2,
-      'الوزن الثاني المعتمد (كجم)': r.secondWeight,
-      'فرق تعديل الثانية (كجم)': original2 == null ? '' : Number((r.secondWeight - original2).toFixed(2)),
-      'صافي الحمولة (كجم)': r.netWeight, 'مصدر الأولى': r.firstSource || r.source,
-      'مصدر الثانية': r.secondSource || r.source,
-      'وقت الوزنة الأولى': r.firstTime || '', 'وقت الوزنة الثانية': r.secondTime || '',
-      'تاريخ العملية': stamp(new Date(r.createdAt))
+      'السيارة': r.plate || '—',
+      'المقطورة': r.trailer || '—',
+      'الوزنة الأولى': r.firstWeight ?? '',
+      'الوزنة الثانية': r.secondWeight ?? '',
+      'الصافي': r.netWeight ?? '',
+      'التاريخ': r.createdAt ? stamp(new Date(r.createdAt)) : '—',
+      'صادر / وارد': r.movementType || '—'
     };
   }
 
@@ -1559,27 +1535,58 @@
     const escapeHtml = value => String(value ?? '').replace(/[&<>"']/g, char => ({
       '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;'
     })[char]);
-    const printWindow = window.open('', '_blank');
-    if (!printWindow) { showToast('اسمح بفتح النوافذ المنبثقة لإتمام الطباعة'); return; }
     const tableHead = columns.map(column => '<th>' + escapeHtml(column) + '</th>').join('');
     const tableRows = rows.map(row => '<tr>' + columns.map(column => '<td>' + escapeHtml(row[column]) + '</td>').join('') + '</tr>').join('');
-    printWindow.document.open();
-    printWindow.document.write(`<!doctype html>
-<html lang="ar" dir="rtl"><head><meta charset="UTF-8"><title>تقرير Excel - برنامج الميزان</title>
-<style>
-@page { size: landscape; margin: 10mm; }
-body { font-family: Arial,Tahoma,sans-serif; color:#111; padding:12px; }
-h2 { text-align:center; margin:0 0 8px; } p { text-align:center; margin:0 0 16px; color:#555; font-size:12px; }
-table { width:100%; border-collapse:collapse; font-size:10px; }
-th,td { border:1px solid #777; padding:6px 5px; text-align:center; }
-th { background:#e9edf0 !important; font-weight:bold; } tr { break-inside:avoid; }
-@media print { body { padding:0; } }
-</style></head><body>
-<h2>تقرير سجل الوزن</h2><p>تاريخ الطباعة: ${escapeHtml(new Date().toLocaleString('ar-EG'))}</p>
-<table><thead><tr>${tableHead}</tr></thead><tbody>${tableRows}</tbody></table>
-<script>window.addEventListener('load', () => { window.focus(); window.print(); });<\/script>
-</body></html>`);
-    printWindow.document.close();
+    const existingArea = document.getElementById('weightReportPrintArea');
+    const existingStyle = document.getElementById('weightReportPrintStyle');
+    existingArea?.remove();
+    existingStyle?.remove();
+
+    const printArea = document.createElement('section');
+    printArea.id = 'weightReportPrintArea';
+    printArea.innerHTML = `
+      <h2>تقرير سجل الوزن</h2>
+      <p>تاريخ الطباعة: ${escapeHtml(new Date().toLocaleString('ar-EG'))}</p>
+      <table><thead><tr>${tableHead}</tr></thead><tbody>${tableRows}</tbody></table>
+    `;
+    const printStyle = document.createElement('style');
+    printStyle.id = 'weightReportPrintStyle';
+    printStyle.textContent = `
+      #weightReportPrintArea { display:none; }
+      @media print {
+        body.printing-weight-report > *:not(#weightReportPrintArea) { display:none !important; }
+        body.printing-weight-report #weightReportPrintArea {
+          display:block !important; width:100% !important; padding:10mm !important;
+          margin:0 !important; background:#fff !important; color:#172744 !important;
+          direction:rtl !important; font-family:Arial,Tahoma,sans-serif !important;
+        }
+        #weightReportPrintArea h2 { text-align:center; margin:0 0 8px; font-size:20px; }
+        #weightReportPrintArea p { text-align:center; margin:0 0 16px; color:#687487; font-size:12px; }
+        #weightReportPrintArea table { width:100%; border-collapse:collapse; font-size:11px; white-space:nowrap; }
+        #weightReportPrintArea th,#weightReportPrintArea td { border:1px solid #9aa5b5; padding:8px 7px; text-align:center; }
+        #weightReportPrintArea th { background:#edf0f5 !important; font-weight:bold; }
+        #weightReportPrintArea tr { break-inside:avoid; }
+      }
+      @page { size:landscape; margin:10mm; }
+    `;
+    document.head.appendChild(printStyle);
+    document.body.appendChild(printArea);
+    document.body.classList.add('printing-weight-report');
+
+    const cleanup = () => {
+      document.body.classList.remove('printing-weight-report');
+      printArea.remove();
+      printStyle.remove();
+      window.removeEventListener('afterprint', cleanup);
+    };
+    window.addEventListener('afterprint', cleanup, { once: true });
+    try {
+      window.focus();
+      window.print();
+    } catch (error) {
+      cleanup();
+      showToast('تعذرت طباعة التقرير: ' + error.message);
+    }
   }
 
   async function exportExcel() {
@@ -1611,8 +1618,8 @@ th { background:#e9edf0 !important; font-weight:bold; } tr { break-inside:avoid;
   function exportCSV() {
     const exportRecords = getReportExportRecords();
     if(!exportRecords.length){showToast('لا توجد عمليات لتصديرها');return;}
-    const header=['رقم التذكرة','المستخدم','نوع الحركة','رقم السيارة','رقم المقطورة','اسم العميل','اسم السائق','اسم الشحنة','المحافظة','الوزنة الأولى كجم','الوزنة الثانية كجم','الوزن الصافي كجم','التاريخ'];
-    const lines=[header,...exportRecords.map(r=>[r.id,r.createdByUserName || '',r.movementType || '—',r.plate,r.trailer || '—',r.customer,r.driver,r.shipment || '—',r.governorate || '—',r.firstWeight,r.secondWeight,r.netWeight,stamp(new Date(r.createdAt))])];
+    const header=['السيارة','المقطورة','الوزنة الأولى','الوزنة الثانية','الصافي','التاريخ','صادر / وارد'];
+    const lines=[header,...exportRecords.map(r=>Object.values(excelRowForRecord(r)))];
     const csv='\uFEFF'+lines.map(row=>row.map(v=>'"'+String(v).replace(/"/g,'""')+'"').join(',')).join('\r\n');
     const blob=new Blob([csv],{type:'text/csv;charset=utf-8;'});
     const url=URL.createObjectURL(blob);const a=document.createElement('a');a.href=url;a.download='weighbridge-records.csv';a.click();URL.revokeObjectURL(url);
@@ -1910,7 +1917,7 @@ th { background:#e9edf0 !important; font-weight:bold; } tr { break-inside:avoid;
 
   if (!desktop && !('serial' in navigator)) $('serialState').textContent = 'استخدم Chrome أو Edge على كمبيوتر لعرض منافذ Serial.';
   if (navigator.serial) navigator.serial.addEventListener('disconnect', () => { if (serialPort) disconnectSerial(); });
-  $('printReport').addEventListener('click',()=>window.print());
+  $('printReport').addEventListener('click',printExcelReport);
   $('closeTicket').addEventListener('click',()=>$('ticketModal').classList.remove('open'));
   $('closeTicket2').addEventListener('click',()=>$('ticketModal').classList.remove('open'));
   $('printTicket').addEventListener('click',printTicketOnly);
@@ -2183,7 +2190,6 @@ th { background:#e9edf0 !important; font-weight:bold; } tr { break-inside:avoid;
     $('supervisorAddUser').hidden = !isSupervisor;
     $('accountSettingsButton').hidden = !isSupervisor;
     $('operatorAccountSettingsButton').hidden = !isOperator;
-    $('reportUserHeader').hidden = !isSupervisor;
     $('openExcelFile').hidden = !isSupervisor;
     $('chooseExcelFile').hidden = !isSupervisor;
     $('clearData').hidden = isSupervisor;
