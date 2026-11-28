@@ -566,3 +566,11 @@ html.operator-dashboard-only .operator-logout-button[hidden]{
   font-size:10px;
   line-height:1.8;
 }
+
+
+.password-field{position:relative;width:100%;min-width:0}
+.password-field input{padding-left:46px!important}
+.password-visibility{position:absolute;left:8px;top:50%;transform:translateY(-50%);display:grid;place-items:center;width:34px;height:34px;padding:0;border:0;border-radius:7px;background:transparent;color:#8fa8b2;cursor:pointer}
+.password-visibility:hover{background:#29404c;color:#65d6c8}
+.password-visibility:focus-visible{outline:2px solid #3bc4b6;outline-offset:2px}
+.password-visibility svg{width:19px;height:19px;fill:none;stroke:currentColor;stroke-width:1.8;stroke-linecap:round;stroke-linejoin:round}
