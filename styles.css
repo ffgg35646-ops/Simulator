@@ -577,3 +577,13 @@ html.operator-dashboard-only .operator-logout-button[hidden]{
 
 /* Supervisor customers and companies directory */
 .customer-directory-panel{margin-top:16px}.customer-directory-toolbar{display:grid;grid-template-columns:minmax(0,1fr) minmax(210px,280px);gap:10px;margin-bottom:14px}.customer-directory-toolbar .search-input{max-width:none}.customer-directory-toolbar select{width:100%;background:#0d1820;border:1px solid #2a3b46;border-radius:8px;padding:10px 11px;color:#edf4f7;font-size:11px;outline:none}.customer-directory-toolbar select:focus{border-color:#29b9ae;box-shadow:0 0 0 3px #20c6b715}.customer-directory-panel td strong{color:#e4f1f3}@media(max-width:700px){.customer-directory-toolbar{grid-template-columns:1fr}.customer-directory-toolbar select{min-height:42px}}
+
+/* Supervisor user administration */
+.supervisor-users-panel{margin:14px 0}
+.supervisor-users-panel .table-wrap{overflow-x:auto}
+.supervisor-users-panel table{min-width:720px}
+.supervisor-users-panel .table-actions{display:flex;flex-wrap:wrap;gap:6px}
+.supervisor-users-panel .table-action{white-space:nowrap}
+.user-state{display:inline-flex;align-items:center;padding:4px 9px;border-radius:20px;font-size:10px;font-weight:700}
+.user-state.is-active{color:#73dfb0;background:#173b32}
+.user-state.is-disabled{color:#ffb1a9;background:#492a2b}
